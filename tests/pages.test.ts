@@ -11,7 +11,9 @@ import { contests, stories, storyRounds, contestGroups } from "../src/db/schema"
 
 test("собранные страницы читают SQLite и не раскрывают приватные данные", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-pages-test-"));
-  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "pages.db")}` };
+  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "pages.db")}`,
+    SESSION_SECRET: "public-pages-test-secret-with-at-least-32-characters", APP_URL: "https://grelqa.test",
+    MAIL_MODE: "smtp", SMTP_HOST: "127.0.0.1", SMTP_PORT: "9", MAIL_FROM: "test@grelqa.test" };
   let server: ReturnType<typeof spawn> | undefined;
   try {
     for (const script of ["scripts/migrate.ts", "scripts/seed.ts"]) {

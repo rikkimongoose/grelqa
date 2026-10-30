@@ -1,12 +1,37 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { migrate } from "drizzle-orm/libsql/migrator";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { eq } from "drizzle-orm";
 import { openDatabase } from "../src/db/connection";
 import * as s from "../src/db/schema";
+
+test("миграция аутентификации сохраняет существующие конкурсные данные и хеши пользователей", async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-upgrade-test-"));
+  const url = `file:${path.join(directory, "old.db")}`;
+  const { db, client } = await openDatabase(url);
+  try {
+    const initial = path.join(directory, "initial");
+    await mkdir(path.join(initial, "meta"), { recursive: true });
+    const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8"));
+    journal.entries = journal.entries.slice(0, 1);
+    await writeFile(path.join(initial, "meta/_journal.json"), JSON.stringify(journal));
+    await copyFile(`drizzle/${journal.entries[0].tag}.sql`, path.join(initial, `${journal.entries[0].tag}.sql`));
+    await migrate(db, { migrationsFolder: initial });
+    execFileSync(process.execPath, ["--import", "tsx", "scripts/seed.ts"], { env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
+    const tables = ["users", "contests", "contest_themes", "participations", "stories", "story_rounds", "contest_groups", "ballots", "ballot_entries"];
+    const before = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows));
+    await migrate(db, { migrationsFolder: "drizzle" });
+    await migrate(db, { migrationsFolder: "drizzle" });
+    const after = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows));
+    assert.deepEqual(after, before);
+    assert.deepEqual((await client.execute("PRAGMA foreign_key_check")).rows, []);
+    assert.equal((await client.execute("SELECT count(*) AS count FROM auth_sessions")).rows[0].count, 0);
+  } finally { client.close(); await rm(directory, { recursive: true, force: true }); }
+});
 
 test("миграции, seed, ограничения, история и публичные данные на отдельной SQLite", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-db-test-"));

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique } from "drizzle-orm/sqlite-core";
+import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const stages = ["preparation", "submissions", "moderation", "round-one", "round-two", "completed", "failed"] as const;
 const id = () => text("id").primaryKey();
@@ -12,6 +12,28 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   emailVerifiedAt: instant("email_verified_at"),
   createdAt: instant("created_at").notNull(),
+}, (t) => [uniqueIndex("users_normalized_email").on(sql`lower(trim(${t.email}))`)]);
+
+export const authSessions = sqliteTable("auth_sessions", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: instant("created_at").notNull(),
+  expiresAt: instant("expires_at").notNull(),
+}, (t) => [index("auth_session_user").on(t.userId)]);
+
+export const authTokens = sqliteTable("auth_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  purpose: text("purpose", { enum: ["verify", "reset"] }).notNull(),
+  createdAt: instant("created_at").notNull(),
+  expiresAt: instant("expires_at").notNull(),
+  usedAt: instant("used_at"),
+}, (t) => [index("auth_token_user").on(t.userId, t.purpose), check("auth_token_purpose", sql`${t.purpose} in ('verify','reset')`)]);
+
+export const authRateLimits = sqliteTable("auth_rate_limits", {
+  key: text("key").primaryKey(),
+  attempts: integer("attempts").notNull(),
+  resetsAt: instant("resets_at").notNull(),
 });
 
 export const contests = sqliteTable("contests", {

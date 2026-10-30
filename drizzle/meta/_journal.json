@@ -8,6 +8,13 @@
       "when": 1793393221330,
       "tag": "0000_previous_tusk",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793396380762,
+      "tag": "0001_flippant_nemesis",
+      "breakpoints": true
     }
   ]
 }
