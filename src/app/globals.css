@@ -78,6 +78,24 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 .schedule-note { font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); padding-top: 20px; margin: 24px 0 0; }
 .skip-link { position: fixed; top: -100px; left: 20px; z-index: 10; padding: 10px; background: var(--paper); }
 .skip-link:focus { top: 10px; }
+.contest-stories { border-top: 1px solid var(--line); padding-block: 36px 65px; scroll-margin-top: 25px; }
+.empty-stories { background: #eeeee4; padding: 24px; color: var(--muted); border-radius: 4px; }
+.story-group { margin-top: 32px; }
+.story-group h3 { font-size: 24px; }
+.story-list { list-style: none; margin: 0; padding: 0; }
+.story-list li { display: flex; align-items: center; gap: 24px; justify-content: space-between; border-bottom: 1px solid var(--line); padding: 22px 0; }
+.story-list h4 { font: 24px/1.35 var(--serif); margin: 0 0 8px; overflow-wrap: anywhere; }
+.story-list p { margin-bottom: 0; }
+.story-read { flex-shrink: 0; font-size: 14px; padding: 10px 4px; }
+.reading-page { width: min(100%, 740px); margin: 0 auto; padding-bottom: 65px; }
+.reading-article { margin-top: 44px; }
+.reading-header { border-bottom: 1px solid var(--line); padding-bottom: 24px; margin-bottom: 38px; }
+.reading-header h1 { font-size: clamp(36px, 6vw, 56px); letter-spacing: -1px; overflow-wrap: anywhere; }
+.reading-header .eyebrow { line-height: 1.7; }
+.reading-header p:last-child { margin-bottom: 0; }
+.story-text { font: 21px/1.85 var(--serif); overflow-wrap: anywhere; }
+.story-text p { margin-bottom: 1.3em; white-space: pre-wrap; }
+.reading-back { border-top: 1px solid var(--line); padding-top: 24px; }
 @media (max-width: 950px) {
   .wrap { width: calc(100% - 48px); }
   .contest-grid { grid-template-columns: 1fr; }
@@ -104,5 +122,9 @@ h3 { font-size: 28px; margin-bottom: 16px; }
   .detail-grid { grid-template-columns: 1fr; gap: 25px; }
   .theme-panel, .schedule { padding: 24px; }
   .contest-hero { padding-bottom: 28px; }
+  .story-list li { align-items: start; gap: 16px; }
+  .story-list h4 { font-size: 21px; }
+  .story-text { font-size: 19px; line-height: 1.75; }
+  .reading-article { margin-top: 32px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

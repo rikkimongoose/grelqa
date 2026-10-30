@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { StageBadge } from "@/components/stage-badge";
-import { contests } from "@/lib/contests";
+import { getPublicContests } from "@/db/public-contests";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+export default async function Home() {
+  const contests = await getPublicContests();
   return <>
     <section className="hero">
       <p className="eyebrow">Анонимные литературные конкурсы</p>
@@ -12,7 +16,8 @@ export default function Home() {
       <span className="hero-mark" aria-hidden="true">Аа</span>
     </section>
     <section id="contests" className="contest-section" aria-labelledby="contests-title">
-      <div className="section-heading"><div><p className="eyebrow">Открываем новую страницу</p><h2 id="contests-title">Конкурсы</h2></div><span className="muted">03 истории впереди</span></div>
+      <div className="section-heading"><div><p className="eyebrow">Открываем новую страницу</p><h2 id="contests-title">Конкурсы</h2></div><span className="muted">Конкурсов: {contests.length}</span></div>
+      {contests.length === 0 && <p className="muted">Пока нет конкурсов.</p>}
       <div className="contest-grid">{contests.map((contest) => <article className="contest-card" key={contest.slug}>
         <div className="card-top"><StageBadge stage={contest.stage} /><span className="card-number">{contest.number}</span></div>
         <h3><Link href={`/contests/${contest.slug}`}>{contest.title}</Link></h3>
@@ -22,6 +27,6 @@ export default function Home() {
         <Link className="text-link" href={`/contests/${contest.slug}`}>О конкурсе <span aria-hidden="true">↗</span></Link>
       </article>)}</div>
     </section>
-    <aside className="editorial-note"><span aria-hidden="true">§</span><div><h2>У каждой истории есть голос</h2><p>Авторы остаются анонимными до конца голосования по конкурсу, включая финал. Опубликованные конкурсные произведения можно читать без регистрации.</p><p className="muted">Сейчас доступны описания и расписания. Подача работ, чтение произведений и голосование появятся на следующих этапах разработки.</p></div></aside>
+    <aside className="editorial-note"><span aria-hidden="true">§</span><div><h2>У каждой истории есть голос</h2><p>Авторы остаются анонимными до конца голосования по конкурсу, включая финал. Опубликованные конкурсные произведения можно читать без регистрации.</p><p className="muted">Сейчас доступны описания, расписания и чтение опубликованных рассказов. Подача работ и голосование появятся на следующих этапах разработки.</p></div></aside>
   </>;
 }
