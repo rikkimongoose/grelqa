@@ -8,7 +8,7 @@ const labels: Record<Mode, string> = { register: "Зарегистрироват
 const subscribeHash = (callback: () => void) => { window.addEventListener("hashchange", callback); return () => window.removeEventListener("hashchange", callback); };
 const readToken = () => new URLSearchParams(window.location.hash.slice(1)).get("token") || "";
 
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({ mode, returnTo }: { mode: Mode; returnTo?: string }) {
   const token = useSyncExternalStore(subscribeHash, readToken, () => "");
   const [message, setMessage] = useState("");
   const [next, setNext] = useState("");
@@ -21,7 +21,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setBusy(true); setMessage(""); setNext("");
     const data = Object.fromEntries(new FormData(event.currentTarget));
     try {
-      const response = await fetch(`/api/account/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, token }) });
+      const response = await fetch(`/api/account/${mode}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...data, token, returnTo }) });
       const result = await response.json();
       setMessage(result.message || "Проверьте поля формы.");
       if (response.ok) {
@@ -41,7 +41,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     {needsToken && !token && !success && <p role="status">Откройте полную ссылку из письма. Ссылка отсутствует или неверна.</p>}
     <button className="button" type="submit" disabled={busy || (needsToken && (!token || success))}>{busy ? "Подождите…" : labels[mode]}</button>
     {message && <p className="auth-message" role="status">{message}</p>}
-    {next && <Link className="text-link" href={next}>{next === "/login" ? "Перейти ко входу" : "Перейти в кабинет"} →</Link>}
+    {next && <Link className="text-link" href={next}>{next === "/login" ? "Перейти ко входу" : next.startsWith("/contests/") ? "Вернуться к конкурсу" : "Перейти в кабинет"} →</Link>}
     {needsToken && <Link className="text-link" href={mode === "verify" ? "/registration-status" : "/forgot-password"}>Запросить новую ссылку →</Link>}
     <noscript>Для отправки этой формы включите JavaScript.</noscript>
   </form>;

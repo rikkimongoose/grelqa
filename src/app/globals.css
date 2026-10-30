@@ -93,6 +93,32 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 .auth-message { background: #eeeee4; padding: 16px; overflow-wrap: anywhere; }
 .auth-links { display: flex; flex-wrap: wrap; gap: 14px 24px; font-size: 14px; }
 .auth-links a { text-decoration: underline; text-underline-offset: 4px; }
+.main-nav { display: flex; flex-wrap: wrap; gap: 16px; }
+.my-stories, .editing-page { margin: 40px auto 70px; max-width: 900px; }
+.my-stories h1, .editing-page h1 { font-size: clamp(36px, 6vw, 52px); margin-top: 25px; }
+.open-contests { margin-top: 40px; }
+.open-contests li { margin-block: 14px; }
+.submission-action { margin-bottom: 35px; padding: 24px; background: #eeeee4; border-radius: 4px; }
+.submission-action p { margin-bottom: 14px; }
+.story-form { display: grid; gap: 18px; margin-top: 28px; }
+.story-form > label { display: grid; gap: 8px; }
+.story-form input { width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 3px; font: inherit; font-size: 18px; color: var(--ink); background: #fdfcf8; }
+.editor-toolbar, .editor-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.editor-toolbar button, .withdraw-form button { padding: 10px 15px; font: inherit; border: 1px solid var(--line); border-radius: 3px; color: var(--ink); background: #fdfcf8; cursor: pointer; }
+.editor-toolbar button[aria-pressed="true"] { background: var(--accent); color: white; }
+.story-form .button { border: 0; font: inherit; cursor: pointer; }
+.story-form button:disabled, .withdraw-form button:disabled { opacity: .5; cursor: not-allowed; }
+.story-form input:focus-visible, .story-form button:focus-visible, .withdraw-form button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.story-form p { margin: 0; }
+.prose-editor { min-height: 360px; padding: 25px; background: #fdfcf8; border: 1px solid var(--line); border-radius: 4px; font: 20px/1.8 var(--serif); overflow-wrap: anywhere; }
+.prose-editor:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+.prose-editor p { margin: 0 0 1.2em; }
+.story-counter { font-size: 15px; }
+.story-preview { padding: 26px; border: 1px solid var(--line); background: #fdfcf8; border-radius: 4px; }
+.withdraw-form { border-top: 1px solid var(--line); padding-top: 25px; margin-top: 40px; font-size: 14px; }
+.withdraw-form h2 { font-size: 28px; }
+.withdraw-form label { display: block; margin-bottom: 20px; }
+.withdraw-form input { margin-right: 8px; }
 .contest-stories { border-top: 1px solid var(--line); padding-block: 36px 65px; scroll-margin-top: 25px; }
 .empty-stories { background: #eeeee4; padding: 24px; color: var(--muted); border-radius: 4px; }
 .story-group { margin-top: 32px; }
@@ -121,6 +147,8 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 }
 @media (max-width: 620px) {
   .header-account { flex-basis: 100%; margin: 0; }
+  .prose-editor { padding: 16px; font-size: 19px; }
+  .my-stories .story-list li { flex-direction: column; }
   .wrap { width: calc(100% - 36px); }
   .site-header { flex-wrap: wrap; gap: 12px 28px; padding-block: 18px; }
   .prototype { flex-basis: 100%; margin: 0; font-size: 11px; }

@@ -1,4 +1,5 @@
 import type { StoryContent } from "../db/schema";
+import { countStoryText } from "./submission";
 
 // JSON из хранилища тоже проверяем; пропускаем только известные текстовые поля.
 export function parseStoryContent(value: unknown): StoryContent | null {
@@ -17,6 +18,6 @@ export function parseStoryContent(value: unknown): StoryContent | null {
 }
 
 export function storyVolume(content: StoryContent, length: number | null) {
-  const value = length ?? Array.from(content.map((block) => block.children.map((part) => part.text).join("")).join("\n\n")).length;
+  const value = length ?? countStoryText(content);
   return `${length === null ? "≈ " : ""}${new Intl.NumberFormat("ru-RU").format(value)} знаков с пробелами`;
 }

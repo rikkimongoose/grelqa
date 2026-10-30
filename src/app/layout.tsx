@@ -16,7 +16,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <a className="skip-link" href="#main">К содержимому</a>
         <header className="site-header wrap">
           <Link href="/" className="brand" aria-label="Grelqa — главная">grelqa<span aria-hidden="true">.</span></Link>
-          <nav aria-label="Основная навигация"><Link href="/#contests">Конкурсы</Link></nav>
+          <nav className="main-nav" aria-label="Основная навигация"><Link href="/#contests">Конкурсы</Link>{user?.emailVerifiedAt && <Link href="/account/my-stories">Мои работы</Link>}</nav>
           <div className="header-account">{user ? <><Link href={user.emailVerifiedAt ? "/account" : "/registration-status"}>{user.emailVerifiedAt ? "Мой кабинет" : "Подтвердить email"}</Link><form action="/api/account/logout" method="post"><button type="submit" className="logout-button">Выйти</button></form></> : <><Link href="/login">Войти</Link><Link href="/register">Регистрация</Link></>}</div>
         </header>
         <main id="main" className="wrap">{children}</main>

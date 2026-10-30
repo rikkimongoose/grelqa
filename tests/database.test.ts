@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { openDatabase } from "../src/db/connection";
 import * as s from "../src/db/schema";
 
-test("миграция аутентификации сохраняет существующие конкурсные данные и хеши пользователей", async () => {
+test("миграции сохраняют существующие конкурсные данные и хеши пользователей", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-upgrade-test-"));
   const url = `file:${path.join(directory, "old.db")}`;
   const { db, client } = await openDatabase(url);
@@ -21,12 +21,27 @@ test("миграция аутентификации сохраняет суще�
     await writeFile(path.join(initial, "meta/_journal.json"), JSON.stringify(journal));
     await copyFile(`drizzle/${journal.entries[0].tag}.sql`, path.join(initial, `${journal.entries[0].tag}.sql`));
     await migrate(db, { migrationsFolder: initial });
-    execFileSync(process.execPath, ["--import", "tsx", "scripts/seed.ts"], { env: { ...process.env, DATABASE_URL: url }, stdio: "pipe" });
-    const tables = ["users", "contests", "contest_themes", "participations", "stories", "story_rounds", "contest_groups", "ballots", "ballot_entries"];
-    const before = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows));
+    // Получаем реальные seed-данные на актуальной схеме, а в старую копируем
+    // только существовавшие тогда столбцы. Так тест не зависит от новых defaults ORM.
+    const fixtureUrl = `file:${path.join(directory, "fixture.db")}`;
+    const fixture = await openDatabase(fixtureUrl);
+    const tables = ["users", "contests", "contest_themes", "contest_groups", "participations", "stories", "story_rounds", "ballots", "ballot_entries"];
+    const columns = new Map<string, string[]>();
+    try {
+      await migrate(fixture.db, { migrationsFolder: "drizzle" });
+      execFileSync(process.execPath, ["--import", "tsx", "scripts/seed.ts"], { env: { ...process.env, DATABASE_URL: fixtureUrl }, stdio: "pipe" });
+      for (const table of tables) {
+        const names = (await client.execute(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
+        columns.set(table, names);
+        for (const row of (await fixture.client.execute(`SELECT ${names.join(",")} FROM ${table} ORDER BY rowid`)).rows) {
+          await client.execute({ sql: `INSERT INTO ${table} (${names.join(",")}) VALUES (${names.map(() => "?").join(",")})`, args: names.map((_, index) => row[index]) });
+        }
+      }
+    } finally { fixture.client.close(); }
+    const before = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT ${columns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
     await migrate(db, { migrationsFolder: "drizzle" });
     await migrate(db, { migrationsFolder: "drizzle" });
-    const after = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows));
+    const after = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT ${columns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
     assert.deepEqual(after, before);
     assert.deepEqual((await client.execute("PRAGMA foreign_key_check")).rows, []);
     assert.equal((await client.execute("SELECT count(*) AS count FROM auth_sessions")).rows[0].count, 0);

@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { authConfig } from "@/auth/config";
 import { cookieSession } from "@/auth/session";
+import { safeReturnPath } from "@/lib/return-path";
 import { AuthError, consumeToken, createSession, credentials, emailSchema, issueMail, limit, passwordSchema, register, requestReset, revokeSession, sessionUser } from "@/auth/service";
 
 export const runtime = "nodejs";
@@ -39,6 +40,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     // Общие лимиты не доверяют подставляемому X-Forwarded-For.
     if (action !== "logout") await limit(`global:${action}`, action === "login" ? 100 : 30, 900);
     const data = await body(request);
+    const returnTo = safeReturnPath(typeof data === "object" && data !== null && "returnTo" in data ? data.returnTo : undefined);
     if (action === "register") {
       const { email } = emailForm.parse(data);
       const { password } = passwordForm.parse(data);
@@ -47,6 +49,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       const session = await cookieSession();
       await revokeSession(session.token);
       session.token = await createSession(id);
+      session.returnTo = returnTo;
       await session.save();
       try { await issueMail(id, "verify"); } catch (error) {
         if (!(error instanceof AuthError)) throw error;
@@ -62,8 +65,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       const session = await cookieSession();
       await revokeSession(session.token);
       session.token = await createSession(user.id, user.passwordHash);
+      session.returnTo = returnTo;
       await session.save();
-      return reply("Вход выполнен.", 200, (await sessionUser(session.token))?.emailVerifiedAt ? "/account" : "/registration-status");
+      return reply("Вход выполнен.", 200, (await sessionUser(session.token))?.emailVerifiedAt ? returnTo || "/account" : "/registration-status");
     }
     if (action === "logout") {
       const session = await cookieSession();
@@ -95,7 +99,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     const { token } = z.object({ token: z.string().max(100) }).parse(data);
     if (action === "verify") {
       await consumeToken("verify", token);
-      return reply("Email подтверждён. Теперь можно войти в кабинет.", 200, "/account");
+      const session = await cookieSession();
+      return reply("Email подтверждён. Теперь можно войти в кабинет.", 200, safeReturnPath(session.returnTo) || "/account");
     }
     const { password } = passwordForm.parse(data);
     await consumeToken("reset", token, password);

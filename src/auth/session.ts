@@ -8,7 +8,7 @@ import { sessionUser } from "./service";
 export async function cookieSession() {
   const store = await cookies();
   const config = authConfig();
-  return getIronSession<{ token?: string }>(store, {
+  return getIronSession<{ token?: string; returnTo?: string }>(store, {
     password: config.secret, cookieName: config.production ? "__Host-grelqa" : "grelqa",
     ttl: 30 * 86400,
     cookieOptions: { httpOnly: true, sameSite: "lax", secure: config.production, path: "/", maxAge: 30 * 86400 },

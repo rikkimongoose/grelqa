@@ -17,11 +17,17 @@
     "db:seed": "node --import tsx scripts/seed.ts",
     "test:db": "node --conditions=react-server --import tsx --test tests/database.test.ts",
     "test:pages": "node --import tsx --test tests/pages.test.ts",
-    "test:auth": "node --conditions=react-server --import tsx --test tests/auth.test.ts"
+    "test:auth": "node --conditions=react-server --import tsx --test tests/auth.test.ts",
+    "db:demo-submissions": "node --import tsx scripts/demo-submissions.ts",
+    "test:submissions": "node --conditions=react-server --import tsx --test tests/submissions.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",
     "@node-rs/argon2": "2.2.2",
+    "@tiptap/core": "3.32.2",
+    "@tiptap/pm": "3.32.2",
+    "@tiptap/react": "3.32.2",
+    "@tiptap/starter-kit": "3.32.2",
     "dotenv": "17.2.3",
     "drizzle-orm": "0.45.4",
     "iron-session": "9.0.1",

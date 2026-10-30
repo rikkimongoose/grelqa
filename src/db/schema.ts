@@ -125,6 +125,7 @@ export const stories = sqliteTable("stories", {
   status: text("status", { enum: ["draft", "submitted", "admitted", "rejected", "withdrawn"] }).notNull().default("draft"),
   createdAt: instant("created_at").notNull(),
   updatedAt: instant("updated_at").notNull(),
+  revision: integer("revision").notNull().default(1),
   publishedAt: instant("published_at"),
   withdrawnAt: instant("withdrawn_at"),
   withdrawalReason: text("withdrawal_reason"),
