@@ -7,6 +7,7 @@ import { getPublicContest } from "@/db/public-contests";
 import { getPublicStoryGroups } from "@/db/public-stories";
 import { currentUser } from "@/auth/session";
 import { submissionContest } from "@/stories/service";
+import { publicGroupingState } from "@/contests/grouping-queries";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,10 +24,12 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
   if (!contest) notFound();
   const groups = await getPublicStoryGroups(slug);
   const [user, submission] = await Promise.all([currentUser(), submissionContest(slug)]);
+  const groupingState = await publicGroupingState(slug);
 
   return <>
     <Link className="back-link" href="/#contests">← Все конкурсы</Link>
     <header className="contest-hero"><StageBadge stage={contest.stage} /><h1>{contest.title}</h1><p className="hero-copy">{contest.description}</p></header>
+    {contest.stage === "failed" && <aside className="empty-stories" role="status"><strong>Конкурс не состоялся.</strong><p>{contest.failureMessage}</p><p>Конкурс и его история сохранены.</p></aside>}
     {submission?.open && <aside className="submission-action">{user?.emailVerifiedAt ? <Link className="button" href={`/contests/${encodeURIComponent(slug)}/submit`}>Подать рассказ →</Link> : user ? <><p>Для подачи рассказа подтвердите email.</p><Link className="button" href="/registration-status">Подтвердить email</Link></> : <><p>Приём открыт. Чтобы подать рассказ, войдите в учётную запись с подтверждённым email.</p><Link className="button" href={`/login?returnTo=${encodeURIComponent(`/contests/${slug}`)}`}>Войти и подать рассказ →</Link></>}</aside>}
     <div className="detail-grid">
       <div>
@@ -38,10 +41,12 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
     </div>
     <section id="stories" className="contest-stories" aria-labelledby="stories-title">
       <div className="section-heading"><div><p className="eyebrow">Время читать</p><h2 id="stories-title">Рассказы</h2></div></div>
-      {groups.length === 0 ? <p className="empty-stories">Пока нет доступных для чтения рассказов. Здесь появятся опубликованные конкурсные работы.</p> : <>
+      {groupingState === "not-formed" && <p className="muted">Группы ещё не сформированы.</p>}
+      {groupingState === "formed-private" && <p className="muted">Группы сформированы. Состав групп и рассказы пока не опубликованы.</p>}
+      {groups.length === 0 ? <p className="empty-stories">{contest.stage === "failed" ? "Публичные рассказы этого конкурса недоступны." : "Пока нет доступных для чтения рассказов. Здесь появятся опубликованные конкурсные работы."}</p> : <>
         <p className="muted">Чтение доступно без регистрации. Справочный объём, отмеченный знаком ≈, не является конкурсным подсчётом.</p>
-        {groups.map((group) => <section className="story-group" key={group.key} aria-label={group.title}>
-          <h3>{group.title}</h3><ul className="story-list">{group.stories.map((story) => <li key={story.id}>
+        {groups.map((group) => <section className="story-group" id={`group-${group.key}`} key={group.key} aria-label={group.title}>
+          <h3>{group.title}</h3>{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
             <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}</p></div>
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>

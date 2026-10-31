@@ -98,6 +98,8 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 .my-stories h1, .editing-page h1 { font-size: clamp(36px, 6vw, 52px); margin-top: 25px; }
 .open-contests { margin-top: 40px; }
 .open-contests li { margin-block: 14px; }
+.voting-group-card { border-bottom: 1px solid var(--line); padding-block: 22px; }
+.voting-group-card h3 { font-size: 25px; }
 .submission-action { margin-bottom: 35px; padding: 24px; background: #eeeee4; border-radius: 4px; }
 .submission-action p { margin-bottom: 14px; }
 .story-form { display: grid; gap: 18px; margin-top: 28px; }

@@ -52,6 +52,14 @@ export async function getPublicStoryGroups(contestSlug: string) {
   const byStory = new Map(assignments.map((item) => [item.storyId, item]));
   type Summary = { id: string; title: string; volume: string };
   const groups = new Map<string, { key: string; title: string; round: number; number: number; stories: Summary[] }>();
+  // Опубликованный якорь группы сохраняется, даже если все её работы сняты.
+  const publishedGroups = await db.select({ id: contestGroups.id, round: contestGroups.round, number: contestGroups.number }).from(contestGroups)
+    .innerJoin(contests, eq(contestGroups.contestId, contests.id)).where(and(
+      eq(contests.slug, contestSlug), inArray(contests.stage, ["round-one", "round-two", "completed"]),
+      lte(contests.roundOneStartAt, new Date()), lte(contestGroups.publishedAt, new Date()),
+      lte(contestGroups.round, sql`case when ${contests.stage} = 'round-one' then 1 else 2 end`),
+    ));
+  for (const group of publishedGroups) groups.set(group.id, { key: group.id, title: `${group.round === 1 ? "Первый тур" : "Финал"} · Группа ${group.number}`, round: group.round, number: group.number, stories: [] });
   for (const row of rows) {
     const content = parseStoryContent(row.content);
     if (!content) continue;

@@ -3,6 +3,7 @@ import { and, asc, eq, lte, ne } from "drizzle-orm";
 import type { Contest } from "../lib/contests";
 import { getDatabase } from "./index";
 import { contests, contestThemes } from "./schema";
+import { publicFailureMessage } from "../contests/grouping-rules";
 
 // Белый список публичных полей. Пользователи, авторы и бюллетени вообще не читаются.
 // Скрытая тема и её условия отсекаются в SQL до формирования результата.
@@ -16,6 +17,7 @@ export async function getPublicContests(slug?: string): Promise<Contest[]> {
     submissionsEndAt: contests.submissionsEndAt, roundOneStartAt: contests.roundOneStartAt,
     roundTwoStartAt: contests.roundTwoStartAt, endsAt: contests.endsAt, isDemo: contests.isDemo,
     theme: contestThemes.theme, conditions: contestThemes.conditions,
+    failureReason: contests.failureReason,
   }).from(contests).leftJoin(contestThemes, and(
     eq(contestThemes.contestId, contests.id),
     ne(contests.stage, "preparation"),
@@ -46,6 +48,7 @@ export async function getPublicContests(slug?: string): Promise<Contest[]> {
       description: row.description, stage: row.stage, theme: row.theme, isDemo: row.isDemo,
       conditions: row.conditions ?? ["Тема и дополнительные условия будут опубликованы при старте конкурса."],
       length, schedule,
+      failureMessage: row.stage === "failed" ? publicFailureMessage(row.failureReason) : null,
     };
   });
 }

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { FirstRoundOutcome } from "../contests/grouping-rules";
 
 export const stages = ["preparation", "submissions", "moderation", "round-one", "round-two", "completed", "failed"] as const;
 const id = () => text("id").primaryKey();
@@ -77,6 +78,13 @@ export const contestThemes = sqliteTable("contest_themes", {
   publishedAt: instant("published_at"),
   accessTokenHash: text("access_token_hash").unique(),
   accessUsedAt: instant("access_used_at"),
+});
+
+// Приватный неизменяемый снимок первичного распределения, не публичный DTO.
+export const firstRoundFormations = sqliteTable("first_round_formations", {
+  contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
+  formedAt: instant("formed_at").notNull(),
+  snapshot: text("snapshot", { mode: "json" }).$type<FirstRoundOutcome>().notNull(),
 });
 
 export const contestGroups = sqliteTable("contest_groups", {

@@ -19,7 +19,12 @@
     "test:pages": "node --import tsx --test tests/pages.test.ts",
     "test:auth": "node --conditions=react-server --import tsx --test tests/auth.test.ts",
     "db:demo-submissions": "node --import tsx scripts/demo-submissions.ts",
-    "test:submissions": "node --conditions=react-server --import tsx --test tests/submissions.test.ts"
+    "test:submissions": "node --conditions=react-server --import tsx --test tests/submissions.test.ts",
+    "db:demo-grouping": "node --import tsx scripts/demo-grouping.ts",
+    "contest:form-groups": "node --import tsx scripts/form-groups.ts",
+    "test:grouping": "node --conditions=react-server --import tsx --test tests/grouping.test.ts",
+    "contest:close-reception": "node --import tsx scripts/close-reception.ts",
+    "db:demo-balanced-groups": "node --import tsx scripts/demo-grouping.ts --blocks"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

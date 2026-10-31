@@ -23,6 +23,7 @@ export type Contest = {
   conditions: string[];
   schedule: ScheduleItem[];
   isDemo?: boolean;
+  failureMessage?: string | null;
 };
 
 export function formatDate(date: string) {
