@@ -108,3 +108,11 @@ Node.js 26.13.0 указан в `.nvmrc`. Установка: `nvm install`, `nv
 - `src/app/contests/[slug]/download/route.ts`: GET готового ZIP, 404 без доступных работ, 503 при ошибке; Content-Disposition с UTF-8 именем. Не добавляйте фиктивные ссылки для пустых групп.
 
 Команды: `npm run exports:clean` удаляет ZIP без обращений 7 дней и брошенные lock/tmp старше 10 минут; `npm run test:exports` после build проверяет экспорт на отдельной временной базе и локальном сервере. Добавьте его к обязательным проверкам перед сдачей. README описывает настройку каталога и ручную проверку. SQL-миграций для экспорта нет; рабочие данные не изменяются.
+
+## RSS и Atom
+
+`src/feeds/` изолирован от сессий и операций записи: `data.ts` — единый server-only запрос последних 10 опубликованных объявлений, `rss.ts`/`atom.ts` — чистые сериализаторы, `xml.ts` — XML 1.0, `settings.ts` — отдельная проверка SITE_URL, `response.ts` — общий HTTP-ответ. Маршруты `src/app/rss.xml/route.ts` и `src/app/atom.xml/route.ts` динамические Node.js GET без авторизации, no-store. Не добавляйте таблицы/seed ради лент.
+
+Политика объявления совпадает с видимостью темы public-contests: stage != preparation, start <= now, theme.publishedAt <= now. Дата — max(start,publishedAt); сортировка вниз, ID вниз для равенства. Постоянные идентификаторы зависят от первичного ID, не от slug. Автор Atom — сервис, никогда не email/организатор/автор рассказов. В модели нет publicUpdatedAt: используйте дату объявления как явно документированный fallback, не Date.now. Пустой Atom updated=epoch, RSS lastBuildDate отсутствует. Ограничение точности обновлений описано в README.
+
+SITE_URL задаёт origin ссылок; development fallback localhost:3000, production без настройки возвращает 503 только для лент, не меняйте ради него authConfig. Относительные alternate-ссылки в root head не зависят от этой настройки и не ломают страницу при ошибке конфигурации лент. `npm run test:feeds` после build обязателен вместе с прежними проверками: HTTP, XML-парсер saxes (только dev), пустая база и публикация на временной SQLite. Рабочую базу не заполнять и не сбрасывать.

@@ -26,7 +26,8 @@
     "contest:close-reception": "node --import tsx scripts/close-reception.ts",
     "db:demo-balanced-groups": "node --import tsx scripts/demo-grouping.ts --blocks",
     "test:exports": "node --conditions=react-server --import tsx --test tests/exports.test.ts",
-    "exports:clean": "node --import tsx scripts/clean-exports.ts"
+    "exports:clean": "node --import tsx scripts/clean-exports.ts",
+    "test:feeds": "node --import tsx --test tests/feeds.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",
@@ -54,6 +55,7 @@
     "drizzle-kit": "0.31.11",
     "eslint": "10.14.0",
     "eslint-config-next": "16.4.3",
+    "saxes": "6.0.0",
     "tsx": "4.23.15",
     "typescript": "~5.9.3"
   },
