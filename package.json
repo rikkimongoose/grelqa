@@ -24,7 +24,9 @@
     "contest:form-groups": "node --import tsx scripts/form-groups.ts",
     "test:grouping": "node --conditions=react-server --import tsx --test tests/grouping.test.ts",
     "contest:close-reception": "node --import tsx scripts/close-reception.ts",
-    "db:demo-balanced-groups": "node --import tsx scripts/demo-grouping.ts --blocks"
+    "db:demo-balanced-groups": "node --import tsx scripts/demo-grouping.ts --blocks",
+    "test:exports": "node --conditions=react-server --import tsx --test tests/exports.test.ts",
+    "exports:clean": "node --import tsx scripts/clean-exports.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",
@@ -35,6 +37,7 @@
     "@tiptap/starter-kit": "3.32.2",
     "dotenv": "17.2.3",
     "drizzle-orm": "0.45.4",
+    "fflate": "0.8.3",
     "iron-session": "9.0.1",
     "next": "16.4.3",
     "nodemailer": "10.3.1",

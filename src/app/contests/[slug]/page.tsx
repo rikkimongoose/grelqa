@@ -24,6 +24,8 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
   if (!contest) notFound();
   const groups = await getPublicStoryGroups(slug);
   const [user, submission] = await Promise.all([currentUser(), submissionContest(slug)]);
+  const downloadHref = `/contests/${encodeURIComponent(slug)}/download`;
+  const hasStories = groups.some((group) => group.stories.length > 0);
   const groupingState = await publicGroupingState(slug);
 
   return <>
@@ -41,12 +43,13 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
     </div>
     <section id="stories" className="contest-stories" aria-labelledby="stories-title">
       <div className="section-heading"><div><p className="eyebrow">Время читать</p><h2 id="stories-title">Рассказы</h2></div></div>
+      {hasStories ? <p><a className="story-read" href={downloadHref}>Скачать конкурс в ZIP</a></p> : <p className="muted">Для скачивания ZIP пока нет доступных рассказов.</p>}
       {groupingState === "not-formed" && <p className="muted">Группы ещё не сформированы.</p>}
       {groupingState === "formed-private" && <p className="muted">Группы сформированы. Состав групп и рассказы пока не опубликованы.</p>}
       {groups.length === 0 ? <p className="empty-stories">{contest.stage === "failed" ? "Публичные рассказы этого конкурса недоступны." : "Пока нет доступных для чтения рассказов. Здесь появятся опубликованные конкурсные работы."}</p> : <>
         <p className="muted">Чтение доступно без регистрации. Справочный объём, отмеченный знаком ≈, не является конкурсным подсчётом.</p>
         {groups.map((group) => <section className="story-group" id={`group-${group.key}`} key={group.key} aria-label={group.title}>
-          <h3>{group.title}</h3>{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
+          <h3>{group.title}</h3>{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
             <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}</p></div>
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>
