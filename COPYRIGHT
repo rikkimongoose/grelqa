@@ -1,0 +1,16 @@
+Grelqa — anonymous literary contest engine
+
+Copyright (C) 2026 rikkimongoose
+SPDX-License-Identifier: AGPL-3.0-only
+
+The original Grelqa engine code is licensed under the GNU Affero General
+Public License, version 3 only. See LICENSE for the complete license text.
+
+Third-party components retain their own copyrights and licenses. See
+THIRD_PARTY_NOTICES.md and third_party/notices/ for available notices
+and the documented limitations of the dependency review.
+
+This engine-code notice does not automatically license uploaded stories,
+other user materials, or the literary content of demonstration data.
+Rights to those materials remain with their respective rightsholders;
+their terms are determined separately.

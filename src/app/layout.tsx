@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
+import { sourceCodeUrl } from "@/server/source-code";
 import { currentUser } from "@/auth/session";
 
 export const metadata: Metadata = {
@@ -10,6 +11,7 @@ export const metadata: Metadata = {
 
 export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await currentUser();
+  const sourceUrl = sourceCodeUrl();
   return (
     <html lang="ru">
       <head>
@@ -24,7 +26,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <div className="header-account">{user ? <><Link href={user.emailVerifiedAt ? "/account" : "/registration-status"}>{user.emailVerifiedAt ? "Мой кабинет" : "Подтвердить email"}</Link><form action="/api/account/logout" method="post"><button type="submit" className="logout-button">Выйти</button></form></> : <><Link href="/login">Войти</Link><Link href="/register">Регистрация</Link></>}</div>
         </header>
         <main id="main" className="wrap">{children}</main>
-        <footer className="site-footer wrap"><span className="footer-brand">grelqa.</span><p>Место для слов, которые стоит написать.</p><nav aria-label="Ленты конкурсов"><a href="/rss.xml">RSS</a>{" · "}<a href="/atom.xml">Atom</a></nav><span>Все конкурсы вымышлены.</span></footer>
+        <footer className="site-footer wrap"><span className="footer-brand">grelqa.</span><p>Место для слов, которые стоит написать.</p><nav aria-label="Ленты конкурсов"><a href="/rss.xml">RSS</a>{" · "}<a href="/atom.xml">Atom</a></nav>{sourceUrl && <a href={sourceUrl} rel="noopener noreferrer">Исходный код</a>}<span>Все конкурсы вымышлены.</span></footer>
       </body>
     </html>
   );
