@@ -34,7 +34,11 @@
     "contest:close-first-round": "node --import tsx scripts/close-first-round.ts",
     "test:closure": "node --conditions=react-server --import tsx --test tests/closure.test.ts",
     "db:demo-closure": "node --import tsx scripts/demo-closure.ts",
-    "db:refresh-demo-copy": "node --import tsx scripts/refresh-demo-copy.ts"
+    "db:refresh-demo-copy": "node --import tsx scripts/refresh-demo-copy.ts",
+    "contest:prepare-final": "node --import tsx scripts/prepare-final.ts",
+    "db:demo-final": "node --import tsx scripts/demo-final.ts",
+    "test:final-voting": "node --conditions=react-server --import tsx --test tests/final-voting.test.ts tests/final-rights-migration.test.ts",
+    "test:final-voting:browser": "node --import tsx --test tests/final-voting-browser.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

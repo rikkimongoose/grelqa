@@ -10,6 +10,7 @@ import { currentUser } from "@/auth/session";
 import { ownStories, submissionContest } from "@/stories/service";
 import { storyVolume } from "@/lib/story-content";
 import { storyStatusLabels } from "@/lib/submission";
+import { publicFinalStatus } from "@/contests/final-queries";
 import { currentBallot } from "@/voting/current";
 import { publicGroupingState } from "@/contests/grouping-queries";
 
@@ -33,6 +34,8 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
   const downloadHref = `/contests/${encodeURIComponent(slug)}/download`;
   const hasStories = groups.some((group) => group.stories.length > 0);
   const ballot = await currentBallot(slug);
+  const finalBallot = await currentBallot(slug, 2);
+  const finalStatus = await publicFinalStatus(slug);
   const groupingState = await publicGroupingState(slug);
 
   return <>
@@ -49,6 +52,9 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
       <section className="schedule" aria-labelledby="schedule-title"><p className="eyebrow">Шаг за шагом</p><h2 id="schedule-title">Расписание</h2><p className="muted">Все даты — по московскому времени (МСК).</p><ol>{contest.schedule.map((item) => <li key={item.stage} className={item.stage === contest.stage ? "current" : ""} aria-current={item.stage === contest.stage ? "step" : undefined}><span className="schedule-label">{item.label}</span><time dateTime={item.date}>{formatDate(item.date)}</time>{item.stage === contest.stage && <span className="current-label">Текущий этап</span>}</li>)}</ol><p className="schedule-note">{contest.isDemo && "Даты и время приведены для примера. "}Второй тур предусмотрен при нескольких группах; порядок завершения конкурса с одной группой ещё требует уточнения.</p></section>
     </div>
     <FirstRoundResults slug={slug} />
+    {finalStatus && <aside className="submission-action"><h2>Финальное голосование</h2><p>До <time dateTime={finalStatus.end}>{formatDate(finalStatus.end)}</time> (МСК, UTC+3).</p><p>Финальные рассказы доступны для чтения без регистрации. Голосовать могут только авторы финалистов с подтверждённым email.</p>
+      {finalBallot ? <><Link className="button" href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>{finalBallot.open && !finalBallot.exempt ? "Голосовать в финале" : "Мой финальный бюллетень"}</Link>{finalBallot.exempt && <p>Вы освобождены: нет доступных чужих финальных работ.</p>}{finalBallot.blockedMessage && <p>{finalBallot.blockedMessage}</p>}</> : <p>{!user ? "Чтобы голосовать, войдите в подтверждённую учётную запись автора финалиста." : !user.emailVerifiedAt ? <Link href="/registration-status">Подтвердите email, чтобы проверить доступ к финальному голосованию.</Link> : "У этой учётной записи нет права финального голоса. Чтение доступно."}</p>}
+    </aside>}
     <section id="stories" className="contest-stories" aria-labelledby="stories-title">
       <div className="section-heading"><div><p className="eyebrow">Время читать</p><h2 id="stories-title">Рассказы</h2></div></div>
       {receiving ? <>
@@ -67,7 +73,7 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
       {groups.length === 0 ? <p className="empty-stories">{contest.stage === "failed" ? "Публичные рассказы этого конкурса недоступны." : "Пока нет доступных для чтения рассказов. Здесь появятся опубликованные конкурсные работы."}</p> : <>
         <p className="muted">Чтение доступно без регистрации. Справочный объём, отмеченный знаком ≈, не является конкурсным подсчётом.</p>
         {groups.map((group) => <section className="story-group" id={`group-${group.key}`} key={group.key} aria-label={group.title}>
-          <h3>{group.title}</h3>{ballot?.groupId === group.key && <p><Link href={`/contests/${encodeURIComponent(slug)}/ballot`}>Мой бюллетень →</Link>{ballot.exempt && " · Вы освобождены от голосования"}</p>}{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
+          <h3>{group.title}</h3>{group.round === 2 && finalBallot && <p><Link href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>Мой финальный бюллетень →</Link></p>}{ballot?.groupId === group.key && <p><Link href={`/contests/${encodeURIComponent(slug)}/ballot`}>Мой бюллетень →</Link>{ballot.exempt && " · Вы освобождены от голосования"}</p>}{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
             <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}</p></div>
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>

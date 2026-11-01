@@ -1,7 +1,7 @@
-import { and, asc, eq, isNull, ne, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Database } from "../db/connection";
-import { contests, contestGroups, firstRoundFormations, firstRoundClosures, participations, stories, storyRounds } from "../db/schema";
+import { contests, contestGroups, firstRoundFormations, firstRoundClosures, finalRounds, participations, stories, storyRounds } from "../db/schema";
 import { parseStoryContent } from "../lib/story-content";
 
 export type VotingDb = Pick<Database, "select" | "update">;
@@ -11,21 +11,23 @@ export function firstRoundOpen(contest: VotingContest, at: Date) {
   return contest.stage === "round-one" && +contest.roundOneStartAt <= +at && +at < +firstRoundDeadline(contest);
 }
 
-export async function eligibleStories(db: VotingDb, contest: VotingContest, groupId: string, userId: string, now = new Date()) {
-  const [group] = await db.select().from(contestGroups).where(and(eq(contestGroups.id, groupId), eq(contestGroups.contestId, contest.id), eq(contestGroups.round, 1)));
+export async function eligibleStories(db: VotingDb, contest: VotingContest, groupId: string, userId: string, now = new Date(), round: 1 | 2 = 1) {
+  const [group] = await db.select().from(contestGroups).where(and(eq(contestGroups.id, groupId), eq(contestGroups.contestId, contest.id), eq(contestGroups.round, round)));
   if (!group || !["moderation", "round-one", "round-two", "completed"].includes(contest.stage)) return [];
   const [formation] = await db.select({ snapshot: firstRoundFormations.snapshot }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contest.id));
+  const [final] = round === 2 ? await db.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contest.id)) : [];
+  if (round === 2 && (!final || group.publishedAt === null || +group.publishedAt > +now || !["round-two", "completed"].includes(contest.stage))) return [];
   const formed = formation && !("kind" in formation.snapshot);
   const legacyPublic = ["round-one", "round-two", "completed"].includes(contest.stage) && +contest.roundOneStartAt <= +now && group.publishedAt !== null && +group.publishedAt <= +now;
   if (!formed && !legacyPublic) return [];
   const withdrawn = alias(storyRounds, "voting_withdrawn");
   const rows = await db.select({ id: stories.id, title: stories.title, content: stories.content, publishedAt: stories.publishedAt }).from(storyRounds)
     .innerJoin(stories, eq(storyRounds.storyId, stories.id)).innerJoin(participations, eq(stories.participationId, participations.id))
-    .where(and(eq(storyRounds.contestId, contest.id), eq(storyRounds.groupId, groupId), eq(storyRounds.round, 1), eq(storyRounds.status, "active"),
+    .where(and(eq(storyRounds.contestId, contest.id), eq(storyRounds.groupId, groupId), eq(storyRounds.round, round), eq(storyRounds.status, "active"),
       eq(stories.status, "admitted"), isNull(stories.withdrawnAt), ne(participations.userId, userId),
       notExists(db.select({ one: sql`1` }).from(withdrawn).where(and(eq(withdrawn.storyId, stories.id), eq(withdrawn.status, "withdrawn")))),
     )).orderBy(asc(stories.createdAt), asc(stories.id));
-  return rows.filter((row) => (formed || row.publishedAt && +row.publishedAt <= +now) && parseStoryContent(row.content))
+  return rows.filter((row) => (round !== 2 || final!.snapshot.storyIds.includes(row.id)) && (formed || row.publishedAt && +row.publishedAt <= +now) && parseStoryContent(row.content))
     .map(({ id, title }) => ({ id, title }));
 }
 
@@ -41,5 +43,31 @@ export async function refreshRoundOneExemptions(db: VotingDb, contestId: string,
     const available = await eligibleStories(db, contest, member.assignedGroupId, member.userId, now);
     if (!available.length && !member.roundOneExemptAt) await db.update(participations).set({ mustVoteRoundOne: false, roundOneExemptAt: now, roundOneExemptReason: "no-eligible-stories" }).where(eq(participations.id, member.id));
     if (available.length && member.roundOneExemptAt) await db.update(participations).set({ mustVoteRoundOne: true, roundOneExemptAt: null, roundOneExemptReason: null }).where(eq(participations.id, member.id));
+  }
+}
+
+
+export const finalRoundOpen = (contest: VotingContest, at: Date) => contest.stage === "round-two" && contest.roundTwoStartAt !== null && +contest.roundTwoStartAt <= +at && +at < +contest.endsAt;
+export async function refreshRoundTwoExemptions(db: VotingDb, contestId: string, now = new Date()) {
+  const [contest] = await db.select().from(contests).where(eq(contests.id, contestId));
+  if (!contest || !["round-two", "completed"].includes(contest.stage)) return;
+  const [final] = await db.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contestId));
+  if (!final) return;
+  const ownWorks = await db.select({ participationId: stories.participationId, status: storyRounds.status, withdrawnAt: storyRounds.withdrawnAt, storyStatus: stories.status, globalWithdrawnAt: stories.withdrawnAt }).from(storyRounds)
+    .innerJoin(stories, eq(storyRounds.storyId, stories.id)).where(and(eq(storyRounds.contestId, contestId), eq(storyRounds.groupId, final.snapshot.groupId), eq(storyRounds.round, 2), inArray(stories.id, final.snapshot.storyIds)));
+  for (const owner of final.snapshot.members) {
+    const [member] = await db.select().from(participations).where(eq(participations.id, owner.participationId));
+    if (!member || member.roundTwoRightsEndedAt) continue;
+    const owned = ownWorks.filter((row) => row.participationId === owner.participationId);
+    if (!owned.some((row) => row.status === "active" && row.storyStatus !== "withdrawn" && row.globalWithdrawnAt === null)) {
+      const lastWithdrawal = owned.reduce((latest, row) => Math.max(latest, +(row.withdrawnAt ?? row.globalWithdrawnAt ?? now)), 0);
+      await db.update(participations).set({ mustVoteRoundTwo: false, roundTwoRightsEndedAt: new Date(lastWithdrawal || +now), roundTwoExemptAt: null, roundTwoExemptReason: null }).where(eq(participations.id, member.id));
+      continue;
+    }
+    // Revocation follows the withdrawal fact even after the deadline; ordinary zero-choice duty is frozen then.
+    if (contest.stage !== "round-two" || +now >= +contest.endsAt) continue;
+    const available = await eligibleStories(db, contest, final.snapshot.groupId, owner.userId, now, 2);
+    if (!available.length && !member.roundTwoExemptAt) await db.update(participations).set({ mustVoteRoundTwo: false, roundTwoExemptAt: now, roundTwoExemptReason: "no-eligible-stories" }).where(eq(participations.id, member.id));
+    if (available.length && member.roundTwoExemptAt) await db.update(participations).set({ mustVoteRoundTwo: true, roundTwoExemptAt: null, roundTwoExemptReason: null }).where(eq(participations.id, member.id));
   }
 }

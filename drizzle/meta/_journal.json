@@ -43,6 +43,20 @@
       "when": 1793524959137,
       "tag": "0005_dashing_frightful_four",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793530375773,
+      "tag": "0006_big_captain_universe",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793532303462,
+      "tag": "0007_regular_ironclad",
+      "breakpoints": true
     }
   ]
 }

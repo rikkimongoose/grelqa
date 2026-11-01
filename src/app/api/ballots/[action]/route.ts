@@ -33,11 +33,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     await limit(`ballots:${user.id}`, 120, 60);
     const { action } = await params;
     if (!["draft", "submit", "add"].includes(action)) return reply({ message: "Действие не найдено." }, 404);
-    const base = { slug: z.string().min(1).max(200), revision: z.number().int().nonnegative(), requestId: z.uuid() };
+    const base = { round: z.union([z.literal(1), z.literal(2)]).default(1), slug: z.string().min(1).max(200), revision: z.number().int().nonnegative(), requestId: z.uuid() };
     const raw = await readJson(request);
     const input = action === "add" ? z.object({ ...base, storyId: z.string().min(1).max(100) }).strict().parse(raw)
       : z.object({ ...base, selections: z.array(z.string().min(1).max(100)).max(6) }).strict().parse(raw);
-    return reply(await changeBallot(session.token, action as "draft" | "submit" | "add", input, receivedAt));
+    return reply(await changeBallot(session.token, action as "draft" | "submit" | "add", input, receivedAt, input.round));
   } catch (error) {
     if (error instanceof AuthError) return reply({ message: error.message }, error.status);
     if (error instanceof z.ZodError) return reply({ message: "Проверьте выбранные работы и версию бюллетеня." }, 400);

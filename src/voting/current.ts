@@ -3,9 +3,9 @@ import { cookieSession, currentUser } from "../auth/session";
 import { AuthError } from "../auth/service";
 import { myBallot } from "./service";
 
-export async function currentBallot(slug: string) {
+export async function currentBallot(slug: string, round: 1 | 2 = 1) {
   const user = await currentUser();
   if (!user?.emailVerifiedAt) return undefined;
-  try { return await myBallot((await cookieSession()).token, slug); }
+  try { return await myBallot((await cookieSession()).token, slug, round); }
   catch (error) { if (error instanceof AuthError && [403, 404].includes(error.status)) return undefined; throw error; }
 }

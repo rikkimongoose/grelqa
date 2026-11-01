@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { FinalRoundSnapshot } from "../contests/final-round-types";
 import type { ClosureSnapshot } from "../contests/closure-rules";
 import type { FirstRoundOutcome } from "../contests/grouping-rules";
 
@@ -110,9 +111,12 @@ export const participations = sqliteTable("participations", {
   assignedRound: integer("assigned_round").notNull().default(1),
   finalist: integer("finalist", { mode: "boolean" }).notNull().default(false),
   mustVoteRoundOne: integer("must_vote_round_one", { mode: "boolean" }).notNull().default(false),
+  mustVoteRoundTwo: integer("must_vote_round_two", { mode: "boolean" }).notNull().default(false),
+  roundTwoRightsEndedAt: instant("round_two_rights_ended_at"),
+  roundTwoExemptAt: instant("round_two_exempt_at"),
+  roundTwoExemptReason: text("round_two_exempt_reason", { enum: ["no-eligible-stories"] }),
   roundOneExemptAt: instant("round_one_exempt_at"),
   roundOneExemptReason: text("round_one_exempt_reason", { enum: ["no-eligible-stories"] }),
-  mustVoteRoundTwo: integer("must_vote_round_two", { mode: "boolean" }).notNull().default(false),
   createdAt: instant("created_at").notNull(),
 }, (t) => [
   unique("participation_user_contest").on(t.userId, t.contestId),
@@ -213,19 +217,27 @@ export const ballotDrafts = sqliteTable("ballot_drafts", {
   primaryKey({ columns: [t.participationId, t.round] }),
   foreignKey({ columns: [t.participationId, t.contestId], foreignColumns: [participations.id, participations.contestId] }).onDelete("restrict"),
   foreignKey({ columns: [t.groupId, t.contestId, t.round], foreignColumns: [contestGroups.id, contestGroups.contestId, contestGroups.round] }).onDelete("restrict"),
-  check("draft_first_round", sql`${t.round} = 1`), check("draft_revision", sql`${t.revision} >= 0`),
+  check("draft_round", roundCheck(t.round)), check("draft_revision", sql`${t.revision} >= 0`),
 ]);
 
 export const ballotRequests = sqliteTable("ballot_requests", {
   participationId: text("participation_id").notNull().references(() => participations.id, { onDelete: "restrict" }),
+  round: integer("round").notNull().default(1),
   requestId: text("request_id").notNull(), payloadHash: text("payload_hash").notNull(),
   response: text("response", { mode: "json" }).$type<{ revision: number; message: string; submittedAt: string | null }>().notNull(),
   receivedAt: instant("received_at").notNull(),
-}, (t) => [primaryKey({ columns: [t.participationId, t.requestId] })]);
+}, (t) => [primaryKey({ columns: [t.participationId, t.round, t.requestId] }), check("request_round", roundCheck(t.round))]);
 
 // Private immutable audit; public queries must project a strict DTO, never serialize snapshot wholesale.
 export const firstRoundClosures = sqliteTable("first_round_closures", {
   contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
   closedAt: instant("closed_at").notNull(),
   snapshot: text("snapshot", { mode: "json" }).$type<ClosureSnapshot>().notNull(),
+});
+
+export const finalRounds = sqliteTable("final_rounds", {
+  contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
+  groupId: text("group_id").notNull().unique().references(() => contestGroups.id, { onDelete: "restrict" }),
+  preparedAt: instant("prepared_at").notNull(),
+  snapshot: text("snapshot", { mode: "json" }).$type<FinalRoundSnapshot>().notNull(),
 });

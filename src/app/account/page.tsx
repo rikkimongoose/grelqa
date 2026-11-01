@@ -1,10 +1,12 @@
 import { requireVerifiedUser } from "@/auth/session";
 import Link from "next/link";
+import { myFinalGroups } from "@/contests/final-queries";
 import { ownFirstRoundResults } from "@/contests/results-queries";
 import { myVotingGroups } from "@/contests/grouping-queries";
 export const metadata = { title: "Мой кабинет", robots: { index: false, follow: false } };
 export default async function AccountPage() {
   const user = await requireVerifiedUser();
+  const finals = await myFinalGroups(user.id);
   const ownResults = await ownFirstRoundResults(user.id);
   const votingGroups = await myVotingGroups(user.id);
   return <section className="auth-page"><p className="eyebrow">Ваше пространство</p><h1>Мой кабинет</h1><p>Email подтверждён: {user.email}</p><Link className="button" href="/account/my-stories">Мои работы →</Link>
@@ -16,6 +18,7 @@ export default async function AccountPage() {
         {group.ballotHref && <p><Link href={group.ballotHref}>Мой бюллетень →</Link></p>}
       </article>)}
     </section>
+    {finals.length > 0 && <section><h2>Финальное голосование</h2>{finals.map((final) => <article key={final.slug}><h3>{final.title}</h3><p>{final.status}</p><Link href={final.href}>Мой финальный бюллетень →</Link></article>)}</section>}
     {ownResults.length > 0 && <section><h2>Результаты моих работ</h2>{ownResults.map((result) => <article key={result.slug}><h3><Link href={`/contests/${encodeURIComponent(result.slug)}#round-one-results`}>{result.title}</Link></h3>
       <p>Голосование: {result.status === "exempt" ? "освобождён от обязанности" : result.status === "submitted" ? "бюллетень отправлен" : result.status === "not-voted" ? "обязанность не выполнена" : "права голоса не было"}.</p>
       {result.failed && <p>Конкурс не состоялся; победители и финалисты не объявляются.</p>}

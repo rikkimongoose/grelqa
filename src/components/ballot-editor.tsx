@@ -33,7 +33,7 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
   }
   async function persist(action: "draft" | "submit") {
     setBusy(true); setMessage("");
-    const payload = { slug: initial.slug, revision, selections: selected.map((entry) => entry.id) };
+    const payload = { round: initial.round, slug: initial.slug, revision, selections: selected.map((entry) => entry.id) };
     const signature = JSON.stringify({ action, ...payload });
     if (retry.current?.payload !== signature) retry.current = { payload: signature, id: crypto.randomUUID() };
     try {
@@ -50,11 +50,12 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
   const reading = (choice: Choice) => `/contests/${encodeURIComponent(initial.slug)}/stories/${encodeURIComponent(choice.id)}`;
   return <>
     <p>Приём бюллетеней до <time dateTime={initial.deadline}>{formatDate(initial.deadline)}</time> (МСК, UTC+3). В момент дедлайна отправка уже закрыта.</p>
-    {!initial.open && <p className="empty-stories">Голосование ещё не открыто или завершено. Доступен просмотр; изменения запрещены.</p>}
-    {initial.exempt && <p className="empty-stories">Вы освобождены от голосования: в назначенной группе нет доступных чужих работ. Отправлять пустой бюллетень не нужно.</p>}
+    {initial.blockedMessage && <p role="alert">{initial.blockedMessage}</p>}
+    {!initial.open && <p className="empty-stories">{initial.blockedMessage ? "Доступен только просмотр сохранённых версий." : "Голосование ещё не открыто или завершено. Доступен просмотр; изменения запрещены."}</p>}
+    {initial.exempt && <p className="empty-stories">Вы освобождены от голосования: в вашем туре нет доступных чужих работ. Отправлять пустой бюллетень не нужно.</p>}
     <section aria-labelledby="submitted-title"><h2 id="submitted-title">Отправленная версия</h2>
       {submittedAt ? <p>Последняя успешная отправка: <time dateTime={submittedAt}>{formatDate(submittedAt)}</time> (МСК).</p> : submitted.length ? <p>Отправка принята. Обновляем время подтверждения…</p> : <p>Бюллетень ещё не отправлен. Черновик не выполняет обязанность голосования.</p>}
-      {submitted.length > 0 && <><p>Бюллетень засчитан. Снятие выбранной работы не отменяет отправку и не сдвигает остальные места.</p><ol>{submitted.map((item) => <li key={item.id} value={item.position}>{item.title}{item.unavailable && " — снята или недоступна, баллы не учитываются"}</li>)}</ol></>}
+      {submitted.length > 0 && <><p>{initial.rightsEnded ? "Сохранена ранее отправленная версия; новые изменения недоступны." : "Бюллетень засчитан. Снятие выбранной работы не отменяет отправку и не сдвигает остальные места."}</p><ol>{submitted.map((item) => <li key={item.id} value={item.position}>{item.title}{item.unavailable && " — снята или недоступна, баллы не учитываются"}</li>)}</ol></>}
     </section>
     <section aria-labelledby="draft-title"><h2 id="draft-title">{hasDraft ? "Сохранённый черновик" : "Ваш выбор"}{dirty ? " · есть несохранённые изменения" : ""}</h2>
       <p aria-live="polite">Выбрано {selected.length} из {initial.required} необходимых работ.</p>
@@ -70,7 +71,7 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
       {writable && <div className="ballot-controls"><button type="button" disabled={busy} onClick={() => persist("draft")}>Сохранить черновик</button><button type="button" disabled={busy} onClick={() => persist("submit")}>Отправить бюллетень</button></div>}
       <p role="status" aria-live="polite">{message}</p>
     </section>
-    <section><h2>Доступные рассказы назначенной группы</h2><p className="muted">Свои работы выбирать нельзя. Порядок можно менять кнопками с клавиатуры или перетаскиванием.</p>
+    <section><h2>{initial.round === 2 ? "Доступные финальные рассказы" : "Доступные рассказы назначенной группы"}</h2><p className="muted">Свои работы выбирать нельзя. Порядок можно менять кнопками с клавиатуры или перетаскиванием.</p>
       <ul className="story-list">{initial.available.map((item) => <li key={item.id}><Link href={reading({ ...item, position: 0, unavailable: false })}>{item.title}</Link><button type="button" disabled={!writable || busy || selected.length >= 6 || selected.some((entry) => entry.id === item.id)} onClick={() => setSelected((rows) => [...rows, { ...item, position: rows.length + 1, unavailable: false }])}>Добавить<span className="sr-only">: {item.title}</span></button></li>)}</ul>
     </section>
   </>;
