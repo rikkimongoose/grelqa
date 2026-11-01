@@ -34,7 +34,7 @@ test("единый Unicode-подсчёт, безопасный формат и 
 
 test("HTTP: свои работы, конкуренция, дедлайн, приватность и снятие с сохранением истории", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-submissions-test-"));
-  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "test.db")}`, SESSION_SECRET: randomBytes(48).toString("base64url"), APP_URL: "https://grelqa.test", MAIL_MODE: "smtp", SMTP_HOST: "127.0.0.1", SMTP_PORT: "9", SMTP_USER: "", SMTP_PASSWORD: "", MAIL_FROM: "test@grelqa.test" };
+  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "test.db")}`, EXPORT_CACHE_DIRECTORY: path.join(directory, "exports"), SESSION_SECRET: randomBytes(48).toString("base64url"), APP_URL: "https://grelqa.test", MAIL_MODE: "smtp", SMTP_HOST: "127.0.0.1", SMTP_PORT: "9", SMTP_USER: "", SMTP_PASSWORD: "", MAIL_FROM: "test@grelqa.test" };
   let server: ReturnType<typeof spawn> | undefined;
   const { db, client } = await openDatabase(env.DATABASE_URL);
   try {
@@ -88,6 +88,19 @@ test("HTTP: свои работы, конкуренция, дедлайн, пр�
     const [stored] = await db.select().from(s.stories).where(eq(s.stories.id, first.id));
     assert.equal(stored.status, "submitted"); assert.equal(stored.publishedAt, null); assert.equal(stored.lengthAlgorithm, LENGTH_ALGORITHM); assert.deepEqual(stored.content, content);
     const [participation] = await db.select().from(s.participations).where(eq(s.participations.id, stored.participationId)); assert.equal(participation.userId, "owner");
+    assert.equal((await post("/api/stories/save", { slug, title: "Личная тайна другого", content: paragraph("123456") }, other.cookie)).status, 200);
+    const contestPage = (cookie: string, rsc: boolean) => fetch(`${base}/contests/${slug}`, { headers: { Cookie: cookie, ...(rsc ? { RSC: "1" } : {}) } });
+    for (const rsc of [false, true]) {
+      const ownContest = await contestPage(owner.cookie, rsc);
+      const body = await ownContest.text();
+      assert.equal(ownContest.status, 200, body.slice(0, 1000));
+      assert.match(ownContest.headers.get("cache-control")!, /private.*no-store/);
+      assert.match(body, /Личная тайна автора/); assert.doesNotMatch(body, /Личная тайна другого|Скачать конкурс в ZIP/);
+      const another = await (await contestPage(other.cookie, rsc)).text();
+      assert.match(another, /Личная тайна другого/); assert.doesNotMatch(another, /Личная тайна автора/);
+      for (const cookie of ["", unverified.cookie]) assert.doesNotMatch(await (await contestPage(cookie, rsc)).text(), /Личная тайна автора|Личная тайна другого/);
+    }
+    assert.equal((await get(`/contests/${slug}/download`, owner.cookie)).status, 404);
     const privatePage = await get(`/account/my-stories/${first.id}`, owner.cookie);
     assert.match(privatePage.headers.get("cache-control")!, /private.*no-store/);
     assert.match(await privatePage.text(), /<strong>Я🙂<\/strong>/);
@@ -102,6 +115,14 @@ test("HTTP: свои работы, конкуренция, дедлайн, пр�
     assert.equal((await post("/api/stories/save", { ...input, id: first.id, revision: 1 }, other.cookie)).status, 404);
     assert.equal((await post("/api/stories/withdraw", { id: first.id, revision: 1, confirmed: true }, other.cookie)).status, 404);
     for (const [text, status] of [["1234", 400], ["12345", 200], ["12345678", 200], ["123456789", 400]] as const) assert.equal((await post("/api/stories/save", { slug, title: `Граница ${text.length}`, content: paragraph(text) }, owner.cookie)).status, status);
+    // A stale/reopened reception stage must not permit edits once groups exist.
+    const [groupContest] = await db.select().from(s.contests).where(eq(s.contests.slug, slug));
+    await db.insert(s.contestGroups).values({ id: "lock-edit-test", contestId: groupContest.id, round: 1, number: 1, capacity: 10 });
+    assert.equal((await post("/api/stories/save", { ...input, id: first.id, revision: 1 }, owner.cookie)).status, 409);
+    assert.equal((await post("/api/stories/save", input, owner.cookie)).status, 409);
+    assert.doesNotMatch(await (await get(`/account/my-stories/${first.id}/edit`, owner.cookie)).text(), /Сохранить работу/);
+    assert.doesNotMatch(await (await get(`/contests/${slug}/submit`, owner.cookie)).text(), /Сохранить работу/);
+    await db.delete(s.contestGroups).where(eq(s.contestGroups.id, "lock-edit-test"));
     const edit = await post("/api/stories/save", { ...input, id: first.id, revision: 1, title: "Изменённый собственный рассказ" }, owner.cookie);
     assert.equal(edit.status, 200);
     const [edited] = await db.select().from(s.stories).where(eq(s.stories.id, first.id));

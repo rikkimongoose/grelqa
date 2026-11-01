@@ -6,7 +6,9 @@ import { formatDate } from "@/lib/contests";
 import { getPublicContest } from "@/db/public-contests";
 import { getPublicStoryGroups } from "@/db/public-stories";
 import { currentUser } from "@/auth/session";
-import { submissionContest } from "@/stories/service";
+import { ownStories, submissionContest } from "@/stories/service";
+import { storyVolume } from "@/lib/story-content";
+import { storyStatusLabels } from "@/lib/submission";
 import { publicGroupingState } from "@/contests/grouping-queries";
 
 export const dynamic = "force-dynamic";
@@ -22,8 +24,10 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
   const { slug } = await params;
   const contest = await getPublicContest(slug);
   if (!contest) notFound();
-  const groups = await getPublicStoryGroups(slug);
+  const receiving = contest.stage === "submissions";
+  const groups = receiving ? [] : await getPublicStoryGroups(slug);
   const [user, submission] = await Promise.all([currentUser(), submissionContest(slug)]);
+  const myStories = receiving && user?.emailVerifiedAt ? await ownStories(user.id, slug) : [];
   const downloadHref = `/contests/${encodeURIComponent(slug)}/download`;
   const hasStories = groups.some((group) => group.stories.length > 0);
   const groupingState = await publicGroupingState(slug);
@@ -43,6 +47,16 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
     </div>
     <section id="stories" className="contest-stories" aria-labelledby="stories-title">
       <div className="section-heading"><div><p className="eyebrow">Время читать</p><h2 id="stories-title">Рассказы</h2></div></div>
+      {receiving ? <>
+        <p className="muted">Во время приёма каждый участник видит только свои рассказы. Работы других участников пока скрыты. После формирования групп редактирование закрывается.</p>
+        {user?.emailVerifiedAt ? <>
+          <h3>Мои рассказы в этом конкурсе</h3>
+          {myStories.length ? <ul className="story-list">{myStories.map((story) => <li key={story.id}>
+            <div><h4><Link href={`/account/my-stories/${story.id}`}>{story.title}</Link></h4><p className="muted">{storyVolume(story.content, story.length)} · {storyStatusLabels[story.status]}</p></div>
+            <Link className="story-read" href={`/account/my-stories/${story.id}`}>Просмотр и действия →</Link>
+          </li>)}</ul> : <p className="empty-stories">Вы ещё не подали рассказов в этот конкурс.</p>}
+        </> : <p className="empty-stories">Войдите с подтверждённым email, чтобы увидеть свои рассказы.</p>}
+      </> : <>
       {hasStories ? <p><a className="story-read" href={downloadHref}>Скачать конкурс в ZIP</a></p> : <p className="muted">Для скачивания ZIP пока нет доступных рассказов.</p>}
       {groupingState === "not-formed" && <p className="muted">Группы ещё не сформированы.</p>}
       {groupingState === "formed-private" && <p className="muted">Группы сформированы. Состав групп и рассказы пока не опубликованы.</p>}
@@ -54,6 +68,7 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>
         </section>)}
+      </>}
       </>}
     </section>
   </>;

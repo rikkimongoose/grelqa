@@ -92,9 +92,9 @@ test("атомарность, конкурентные процессы, сох�
     const sameAuthor = admitted.filter((row) => row.participationId === "demo-group-participation-4");
     assert.equal(sameAuthor[0].title, sameAuthor[1].title); assert.equal(sameAuthor[0].length, sameAuthor[1].length); assert.equal(+sameAuthor[0].createdAt, +sameAuthor[1].createdAt);
     assert.equal(participants.find((row) => row.id === "demo-group-participation-4")?.assignedGroupId, snapshot.groups[0].id, "полный tie не мешает единственной возможной группе");
-    // Публикация не происходит как побочный эффект распределения.
-    assert.ok((await db.select().from(s.stories)).every((row) => row.publishedAt === null));
-    assert.ok((await db.select().from(s.contestGroups)).every((row) => row.publishedAt === null));
+    // Успешное формирование публикует только допущенные работы атомарно.
+    assert.ok((await db.select().from(s.stories)).every((row) => row.status === "admitted" ? row.publishedAt !== null : row.publishedAt === null));
+    assert.ok((await db.select().from(s.contestGroups)).every((row) => row.publishedAt !== null));
     await db.update(s.storyRounds).set({ status: "withdrawn", withdrawnAt: new Date(), withdrawalReason: "Снята после фиксации" }).where(eq(s.storyRounds.storyId, admitted[0].id));
     assert.deepEqual(await formFirstRound(db, slug), first);
     assert.deepEqual(await db.select().from(s.participations), participants);
@@ -212,7 +212,7 @@ test("атомарность, конкурентные процессы, сох�
 
 test("HTTP: состояние формирования, приватное назначение, опубликованные якоря и отсутствие авторства", async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-grouping-pages-"));
-  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "test.db")}`, SESSION_SECRET: randomBytes(48).toString("base64url"), APP_URL: "https://grelqa.test", MAIL_MODE: "smtp", MAIL_FROM: "test@grelqa.test", SMTP_HOST: "127.0.0.1", SMTP_PORT: "9", SMTP_USER: "", SMTP_PASSWORD: "" };
+  const env = { ...process.env, DATABASE_URL: `file:${path.join(directory, "test.db")}`, EXPORT_CACHE_DIRECTORY: path.join(directory, "exports"), SESSION_SECRET: randomBytes(48).toString("base64url"), APP_URL: "https://grelqa.test", MAIL_MODE: "smtp", MAIL_FROM: "test@grelqa.test", SMTP_HOST: "127.0.0.1", SMTP_PORT: "9", SMTP_USER: "", SMTP_PASSWORD: "" };
   const originalMode = process.env.NODE_ENV;
   const { db, client } = await openDatabase(env.DATABASE_URL);
   let server: ReturnType<typeof spawn> | undefined;
@@ -237,10 +237,19 @@ test("HTTP: состояние формирования, приватное на
     assert.match(await get("/account", cookie), /Группа 1/);
     for (const rsc of [false, true]) {
       const body = await get("/contests/demo-first-round", "", rsc);
-      assert.match(body, /Группы сформированы/); assert.doesNotMatch(body, /group-author-|demo-group-participation-|История у окна 1|Полное совпадение/);
+      assert.match(body, /История у окна 1/); assert.match(body, /Скачать конкурс в ZIP/); assert.doesNotMatch(body, /group-author-|demo-group-participation-|passwordHash|assignments/);
     }
-    // Явные изменения ниже — ТОЛЬКО тестовая имитация будущей публикации.
-    // Производственная операция не меняет ни эти поля, ни начало тура.
+    assert.match(await get("/contests/demo-first-round/stories/demo-group-story-1"), /История у окна 1/);
+    assert.equal((await fetch(base + "/contests/demo-first-round/download")).status, 200);
+    assert.equal((await fetch(base + `/contests/demo-first-round/download?group=${groupId}`)).status, 200);
+    assert.doesNotMatch(await get("/contests/demo-first-round/stories/demo-group-story-9"), /История у окна 9/);
+    // Legacy snapshots become readable without rewriting their publication timestamps.
+    await db.update(s.contestGroups).set({ publishedAt: null }).where(eq(s.contestGroups.id, groupId));
+    await db.update(s.stories).set({ publishedAt: null }).where(eq(s.stories.status, "admitted"));
+    assert.match(await get("/contests/demo-first-round/stories/demo-group-story-1"), /История у окна 1/);
+    assert.equal((await fetch(base + "/contests/demo-first-round/download")).status, 200);
+    assert.match(await get("/account", cookie), new RegExp(`#group-${groupId}`));
+    // Voting stage is still set explicitly for withdrawal tests.
     const now = Date.now();
     await db.update(s.contests).set({ stage: "round-one", roundOneStartAt: new Date(now - 1000) }).where(eq(s.contests.slug, "demo-first-round"));
     await db.update(s.contestGroups).set({ publishedAt: new Date(now - 1000) }).where(eq(s.contestGroups.id, groupId));

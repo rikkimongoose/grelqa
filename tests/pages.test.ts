@@ -74,7 +74,7 @@ test("собранные страницы читают SQLite и не раскр
           assert.match(body, /123 знаков с пробелами/);
           assert.match(body, /\/contests\/city-between-lines\/stories\/demo-city-story-1/);
         }
-        if (route === "/contests/letters-to-november") assert.match(body, /Пока нет доступных для чтения рассказов/);
+        if (route === "/contests/letters-to-november") { assert.match(body, /Войдите с подтверждённым email, чтобы увидеть свои рассказы/); assert.doesNotMatch(body, /Скачать конкурс в ZIP/); }
         if (route.includes("/stories/") && !rsc) {
           assert.match(body, /<em>Первый абзац<\/em>/);
           assert.match(body, /<strong><em>Второй абзац<\/em><\/strong>/);

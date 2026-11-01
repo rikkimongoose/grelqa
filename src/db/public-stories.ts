@@ -1,5 +1,6 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull, lte, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
+import { formedPublication, groupedStory, groupPublication } from "./story-publication";
 import { getDatabase } from "./index";
 import type { Database } from "./connection";
 import { contests, contestGroups, stories, storyRounds } from "./schema";
@@ -14,11 +15,10 @@ async function readableStories(contestSlug: string, storyId?: string, connection
   }).from(stories).innerJoin(contests, eq(stories.contestId, contests.id)).where(and(
     eq(contests.slug, contestSlug),
     storyId === undefined ? undefined : eq(stories.id, storyId),
-    inArray(contests.stage, ["round-one", "round-two", "completed"]),
-    lte(contests.roundOneStartAt, now),
+    or(and(inArray(contests.stage, ["round-one", "round-two", "completed"]), lte(contests.roundOneStartAt, now), lte(stories.publishedAt, now)),
+      and(formedPublication(db), groupedStory(db, stories.id))),
     eq(stories.status, "admitted"),
     isNull(stories.withdrawnAt),
-    lte(stories.publishedAt, now),
     // Публикация снятых работ пока не согласована: временно не выдаём их текст.
     notExists(db.select({ one: sql`1` }).from(storyRounds).where(and(
       eq(storyRounds.storyId, stories.id), eq(storyRounds.status, "withdrawn"),
@@ -52,8 +52,7 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
   }).from(storyRounds).innerJoin(contestGroups, eq(storyRounds.groupId, contestGroups.id))
     .innerJoin(contests, eq(contestGroups.contestId, contests.id)).where(and(
       inArray(storyRounds.storyId, rows.map((row) => row.id)),
-      lte(contestGroups.publishedAt, now),
-      lte(contestGroups.round, sql`case when ${contests.stage} = 'round-one' then 1 else 2 end`),
+      groupPublication(db, now),
     )).orderBy(asc(contestGroups.round), asc(contestGroups.number)) : [];
   const byStory = new Map(assignments.map((item) => [item.storyId, item]));
   type Summary = { id: string; title: string; volume: string; content: NonNullable<ReturnType<typeof parseStoryContent>> };
@@ -61,9 +60,7 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
   // Опубликованный якорь группы сохраняется, даже если все её работы сняты.
   const publishedGroups = await db.select({ id: contestGroups.id, round: contestGroups.round, number: contestGroups.number }).from(contestGroups)
     .innerJoin(contests, eq(contestGroups.contestId, contests.id)).where(and(
-      eq(contests.slug, contestSlug), inArray(contests.stage, ["round-one", "round-two", "completed"]),
-      lte(contests.roundOneStartAt, now), lte(contestGroups.publishedAt, now),
-      lte(contestGroups.round, sql`case when ${contests.stage} = 'round-one' then 1 else 2 end`),
+      eq(contests.slug, contestSlug), groupPublication(db, now),
     ));
   for (const group of publishedGroups) groups.set(group.id, { key: group.id, title: `${group.round === 1 ? "Первый тур" : "Финал"} · Группа ${group.number}`, round: group.round, number: group.number, stories: [] });
   for (const row of rows) {

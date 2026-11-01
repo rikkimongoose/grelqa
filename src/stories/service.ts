@@ -1,8 +1,9 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, notExists, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
-import { authSessions, users, contests, participations, stories, storyRounds } from "../db/schema";
+import type { Database } from "../db/connection";
+import { authSessions, users, contests, participations, stories, storyRounds, contestGroups, firstRoundFormations } from "../db/schema";
 import { AuthError, tokenHash } from "../auth/service";
 import { countStoryText, LENGTH_ALGORITHM, lengthError, submissionContent, withinReception } from "../lib/submission";
 
@@ -16,10 +17,22 @@ export function canWithdraw(story: Story, contest: Contest, rounds: (typeof stor
   return Boolean(round && start && +start <= +now && +now < +contest.endsAt && story.status === "admitted" && rounds.some((entry) => entry.round === round && entry.status === "active"));
 }
 
+// A saved formation closes submissions even if the stage/dates were changed accidentally.
+function beforeGrouping(db: Pick<Database, "select">) {
+  return and(
+    notExists(db.select({ one: sql`1` }).from(contestGroups).where(eq(contestGroups.contestId, contests.id))),
+    notExists(db.select({ one: sql`1` }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contests.id))),
+  );
+}
+async function groupingStarted(db: Pick<Database, "select">, contestId: string) {
+  const [row] = await db.select({ id: contests.id }).from(contests).where(and(eq(contests.id, contestId), beforeGrouping(db)));
+  return !row;
+}
+
 export async function receptionContests() {
   const { db } = await getDatabase();
   const now = new Date();
-  return db.select({ slug: contests.slug, title: contests.title }).from(contests).where(and(eq(contests.stage, "submissions"), sql`${contests.submissionsStartAt} <= ${+now}`, gt(contests.submissionsEndAt, now))).orderBy(asc(contests.submissionsStartAt));
+  return db.select({ slug: contests.slug, title: contests.title }).from(contests).where(and(eq(contests.stage, "submissions"), sql`${contests.submissionsStartAt} <= ${+now}`, gt(contests.submissionsEndAt, now), beforeGrouping(db))).orderBy(asc(contests.submissionsStartAt));
 }
 
 export async function submissionContest(slug: string) {
@@ -28,15 +41,15 @@ export async function submissionContest(slug: string) {
   if (!contest) return undefined;
   // В интерфейс передаём только параметры формы, не organizerId.
   return { slug: contest.slug, title: contest.title, minLength: contest.minLength, maxLength: contest.maxLength,
-    open: withinReception(contest), deadline: contest.submissionsEndAt.toISOString() };
+    open: withinReception(contest) && !await groupingStarted(db, contest.id), deadline: contest.submissionsEndAt.toISOString() };
 }
 
-export async function ownStories(userId: string) {
+export async function ownStories(userId: string, contestSlug?: string) {
   const { db } = await getDatabase();
   const rows = await db.select({ id: stories.id, title: stories.title, status: stories.status, content: stories.content, length: stories.length,
     contestTitle: contests.title, contestSlug: contests.slug }).from(stories)
     .innerJoin(participations, eq(stories.participationId, participations.id))
-    .innerJoin(contests, eq(stories.contestId, contests.id)).where(eq(participations.userId, userId))
+    .innerJoin(contests, eq(stories.contestId, contests.id)).where(and(eq(participations.userId, userId), contestSlug === undefined ? undefined : eq(contests.slug, contestSlug)))
     .orderBy(desc(stories.createdAt), asc(stories.id));
   const withdrawn = await db.select({ id: storyRounds.storyId, round: storyRounds.round }).from(storyRounds)
     .innerJoin(stories, eq(storyRounds.storyId, stories.id)).innerJoin(participations, eq(stories.participationId, participations.id))
@@ -52,7 +65,7 @@ export async function ownStory(userId: string, id: string) {
   if (!row) return undefined;
   const rounds = await db.select().from(storyRounds).where(eq(storyRounds.storyId, id));
   return { story: row.story, contest: { slug: row.contest.slug, title: row.contest.title, minLength: row.contest.minLength, maxLength: row.contest.maxLength },
-    editable: withinReception(row.contest) && row.story.status === "submitted" && row.story.publishedAt === null && rounds.length === 0,
+    editable: withinReception(row.contest) && row.story.status === "submitted" && row.story.publishedAt === null && rounds.length === 0 && !await groupingStarted(db, row.contest.id),
     withdrawable: canWithdraw(row.story, row.contest, rounds),
     withdrawnRounds: rounds.filter((entry) => entry.status === "withdrawn").map((entry) => entry.round) };
 }
@@ -75,6 +88,7 @@ export async function saveStory(sessionToken: string | undefined, slug: string, 
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
     if (!contest) throw new AuthError("Конкурс не найден.", 404);
     if (!withinReception(contest, now)) throw new AuthError("Приём работ закрыт. Сохранение недоступно.", 409);
+    if (await groupingStarted(tx, contest.id)) throw new AuthError("Группы уже сформированы. Подача и редактирование закрыты.", 409);
     const invalidLength = lengthError(length, contest.minLength, contest.maxLength);
     if (invalidLength) throw new AuthError(invalidLength);
     if (input.id) {

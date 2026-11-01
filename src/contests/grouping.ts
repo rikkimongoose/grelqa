@@ -88,13 +88,16 @@ export async function formFirstRound(db: Database, slug: string): Promise<Groupi
     }
     snapshot.assignments.sort((a, b) => a.participationId.localeCompare(b.participationId, "en"));
     for (const group of snapshot.groups) {
-      await tx.insert(contestGroups).values({ id: group.id, contestId: contest.id, round: 1, number: group.number, capacity: group.capacity, publishedAt: null });
-      for (const storyId of group.storyIds) await tx.insert(storyRounds).values({ storyId, contestId: contest.id, round: 1, groupId: group.id });
+      await tx.insert(contestGroups).values({ id: group.id, contestId: contest.id, round: 1, number: group.number, capacity: group.capacity, publishedAt: now });
+      for (const storyId of group.storyIds) {
+        await tx.insert(storyRounds).values({ storyId, contestId: contest.id, round: 1, groupId: group.id });
+        await tx.update(stories).set({ publishedAt: now }).where(eq(stories.id, storyId));
+      }
     }
     for (const assignment of snapshot.assignments) await tx.update(participations).set({ assignedGroupId: assignment.groupId, assignedRound: 1, mustVoteRoundOne: true })
       .where(and(eq(participations.id, assignment.participationId), eq(participations.contestId, contest.id), isNull(participations.assignedGroupId)));
     await tx.insert(firstRoundFormations).values({ contestId: contest.id, formedAt: now, snapshot });
-    // Формирование не запускает голосование и не публикует рассказы.
+    // Формирование публикует допущенные работы, но не запускает голосование.
     return { status: "formed", snapshot };
   });
 }
