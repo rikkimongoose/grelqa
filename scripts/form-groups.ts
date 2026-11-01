@@ -17,7 +17,7 @@ async function main() {
     } else {
       console.log(JSON.stringify({ status: "formed", formedAt: result.snapshot.formedAt, version: result.snapshot.version,
         groups: result.snapshot.groups.map((group) => ({ number: group.number, capacity: group.capacity, stories: group.storyIds.length })), assignments: result.snapshot.assignments.length,
-        note: "Результат зафиксирован. Допущенные работы доступны для чтения и скачивания. Голосование ещё не подключено." }, null, 2));
+        note: "Результат зафиксирован. Допущенные работы доступны для чтения и скачивания. Голосование доступно назначенным участникам с началом первого тура." }, null, 2));
     }
   } finally { client.close(); }
 }

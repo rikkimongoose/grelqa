@@ -1,3 +1,4 @@
+import { refreshRoundOneExemptions } from "../voting/eligibility";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import type { Database } from "../db/connection";
@@ -97,6 +98,7 @@ export async function formFirstRound(db: Database, slug: string): Promise<Groupi
     for (const assignment of snapshot.assignments) await tx.update(participations).set({ assignedGroupId: assignment.groupId, assignedRound: 1, mustVoteRoundOne: true })
       .where(and(eq(participations.id, assignment.participationId), eq(participations.contestId, contest.id), isNull(participations.assignedGroupId)));
     await tx.insert(firstRoundFormations).values({ contestId: contest.id, formedAt: now, snapshot });
+    await refreshRoundOneExemptions(tx, contest.id, now);
     // Формирование публикует допущенные работы, но не запускает голосование.
     return { status: "formed", snapshot };
   });

@@ -10,7 +10,8 @@ export default async function AccountPage() {
       {votingGroups.map((group) => <article className="voting-group-card" key={group.slug}><h3><Link href={group.href}>{group.title}{group.assigned ? ` · Группа ${group.number}` : ""}</Link></h3>
         {group.message && <p>{group.message}</p>}{group.waitingPublication && <p className="muted">Назначение сохранено. Состав группы пока не опубликован.</p>}
         {group.assigned && <p className="muted">Нельзя голосовать за любую свою работу. Снятие рассказа не меняет назначение автоматически.</p>}
-        {group.otherWorks === 0 && <p className="muted">Нет доступных чужих работ. Порядок голосования в таком случае ещё требует уточнения.</p>}
+        {group.exempt && <p className="muted">Вы освобождены от голосования: нет доступных чужих работ.</p>}
+        {group.ballotHref && <p><Link href={group.ballotHref}>Мой бюллетень →</Link></p>}
       </article>)}
     </section>
   </section>;

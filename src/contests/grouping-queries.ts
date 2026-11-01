@@ -22,7 +22,7 @@ export async function myVotingGroups(userId: string) {
   const { db } = await getDatabase();
   const rows = await db.select({ id: participations.id, groupId: participations.assignedGroupId,
     contestId: contests.id, title: contests.title, slug: contests.slug, stage: contests.stage, failureReason: contests.failureReason, start: contests.roundOneStartAt,
-    number: contestGroups.number, publishedAt: contestGroups.publishedAt, formationId: firstRoundFormations.contestId,
+    number: contestGroups.number, publishedAt: contestGroups.publishedAt, formationId: firstRoundFormations.contestId, exemptAt: participations.roundOneExemptAt,
   }).from(participations).innerJoin(contests, eq(participations.contestId, contests.id))
     .leftJoin(contestGroups, eq(participations.assignedGroupId, contestGroups.id))
     .leftJoin(firstRoundFormations, eq(firstRoundFormations.contestId, contests.id))
@@ -46,6 +46,6 @@ export async function myVotingGroups(userId: string) {
       href: `/contests/${encodeURIComponent(row.slug)}${published && row.groupId ? `#group-${row.groupId}` : "#stories"}`,
       waitingPublication: row.groupId !== null && !published,
       message: row.stage === "failed" ? `Конкурс не состоялся. ${publicFailureMessage(row.failureReason)}` : row.groupId ? null : row.formationId ? "Группа для голосования не назначена." : "Группы ещё не сформированы.",
-      otherWorks };
+      exempt: row.exemptAt !== null, ballotHref: row.groupId ? `/contests/${encodeURIComponent(row.slug)}/ballot` : null, otherWorks };
   }));
 }

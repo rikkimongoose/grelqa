@@ -174,3 +174,16 @@ h3 { font-size: 28px; margin-bottom: 16px; }
   .reading-article { margin-top: 32px; }
 }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.ballot-page { max-width: 900px; margin: 35px auto 70px; }
+.ballot-page section { margin-block: 30px; }
+.ballot-choices { list-style: none; padding: 0; }
+.ballot-choices li { padding: 16px; margin-block: 10px; border: 1px solid var(--line); background: var(--paper, transparent); border-radius: 6px; }
+.ballot-choices li[draggable="true"] { cursor: grab; }
+.ballot-controls { display: flex; flex-wrap: wrap; gap: 10px; margin-block: 12px; }
+.ballot-page button, .ballot-add button { min-height: 44px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 5px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+.ballot-page button:disabled { opacity: .5; cursor: default; }
+.ballot-page button:focus-visible, .ballot-add button:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+.ballot-add { margin-block: 30px; padding: 20px; border: 1px solid var(--line); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@media (max-width: 600px) { .ballot-page .story-list li { align-items: flex-start; flex-direction: column; gap: 12px; } }

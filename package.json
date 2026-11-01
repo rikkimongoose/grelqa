@@ -27,7 +27,10 @@
     "db:demo-balanced-groups": "node --import tsx scripts/demo-grouping.ts --blocks",
     "test:exports": "node --conditions=react-server --import tsx --test tests/exports.test.ts",
     "exports:clean": "node --import tsx scripts/clean-exports.ts",
-    "test:feeds": "node --import tsx --test tests/feeds.test.ts"
+    "test:feeds": "node --import tsx --test tests/feeds.test.ts",
+    "db:demo-voting": "node --import tsx scripts/demo-voting.ts",
+    "test:voting": "node --conditions=react-server --import tsx --test tests/voting.test.ts",
+    "test:voting:browser": "node --import tsx --test tests/voting-browser.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",
@@ -55,6 +58,7 @@
     "drizzle-kit": "0.31.11",
     "eslint": "10.14.0",
     "eslint-config-next": "16.4.3",
+    "playwright-core": "1.58.2",
     "saxes": "6.0.0",
     "tsx": "4.23.15",
     "typescript": "~5.9.3"

@@ -1,4 +1,5 @@
 import "server-only";
+import { refreshRoundOneExemptions } from "../voting/eligibility";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, isNotNull, notExists, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
@@ -134,5 +135,6 @@ export async function withdrawStory(sessionToken: string | undefined, id: string
       await tx.update(storyRounds).set({ status: "withdrawn", withdrawnAt: now, withdrawalReason: "Снята автором" }).where(and(eq(storyRounds.storyId, id), eq(storyRounds.round, round)));
     }
     await tx.update(stories).set({ ...(reception ? { status: "withdrawn" as const, withdrawnAt: now, withdrawalReason: "Снята автором во время приёма" } : {}), updatedAt: now, revision: revision + 1 }).where(eq(stories.id, id));
+    await refreshRoundOneExemptions(tx, row.contest.id, now);
   });
 }

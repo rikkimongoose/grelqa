@@ -109,6 +109,8 @@ export const participations = sqliteTable("participations", {
   assignedRound: integer("assigned_round").notNull().default(1),
   finalist: integer("finalist", { mode: "boolean" }).notNull().default(false),
   mustVoteRoundOne: integer("must_vote_round_one", { mode: "boolean" }).notNull().default(false),
+  roundOneExemptAt: instant("round_one_exempt_at"),
+  roundOneExemptReason: text("round_one_exempt_reason", { enum: ["no-eligible-stories"] }),
   mustVoteRoundTwo: integer("must_vote_round_two", { mode: "boolean" }).notNull().default(false),
   createdAt: instant("created_at").notNull(),
 }, (t) => [
@@ -199,3 +201,23 @@ export const ballotEntries = sqliteTable("ballot_entries", {
   foreignKey({ columns: [t.storyId, t.contestId, t.round, t.groupId], foreignColumns: [storyRounds.storyId, storyRounds.contestId, storyRounds.round, storyRounds.groupId] }).onDelete("restrict"),
   check("ballot_position_range", sql`${t.position} between 1 and 6`),
 ]);
+
+// Draft state/revision is separate from the effective submitted ballot.
+export const ballotDrafts = sqliteTable("ballot_drafts", {
+  participationId: text("participation_id").notNull(), contestId: text("contest_id").notNull(),
+  round: integer("round").notNull().default(1), groupId: text("group_id").notNull(),
+  selections: text("selections", { mode: "json" }).$type<string[] | null>(),
+  revision: integer("revision").notNull().default(0), updatedAt: instant("updated_at").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.participationId, t.round] }),
+  foreignKey({ columns: [t.participationId, t.contestId], foreignColumns: [participations.id, participations.contestId] }).onDelete("restrict"),
+  foreignKey({ columns: [t.groupId, t.contestId, t.round], foreignColumns: [contestGroups.id, contestGroups.contestId, contestGroups.round] }).onDelete("restrict"),
+  check("draft_first_round", sql`${t.round} = 1`), check("draft_revision", sql`${t.revision} >= 0`),
+]);
+
+export const ballotRequests = sqliteTable("ballot_requests", {
+  participationId: text("participation_id").notNull().references(() => participations.id, { onDelete: "restrict" }),
+  requestId: text("request_id").notNull(), payloadHash: text("payload_hash").notNull(),
+  response: text("response", { mode: "json" }).$type<{ revision: number; message: string; submittedAt: string | null }>().notNull(),
+  receivedAt: instant("received_at").notNull(),
+}, (t) => [primaryKey({ columns: [t.participationId, t.requestId] })]);
