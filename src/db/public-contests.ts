@@ -23,7 +23,7 @@ export async function getPublicContests(slug?: string): Promise<Contest[]> {
     ne(contests.stage, "preparation"),
     lte(contests.submissionsStartAt, now),
     lte(contestThemes.publishedAt, now),
-  )).where(slug ? eq(contests.slug, slug) : undefined)
+  )).where(and(eq(contests.isDraft, false), slug ? eq(contests.slug, slug) : undefined))
     .orderBy(asc(contests.createdAt), asc(contests.slug));
 
   const number = new Intl.NumberFormat("ru-RU");

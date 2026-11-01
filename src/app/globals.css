@@ -193,3 +193,12 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 .round-results table { width: 100%; border-collapse: collapse; margin-block: 20px; font-size: .95rem; }
 .round-results th, .round-results td { text-align: left; vertical-align: top; padding: 12px; border-bottom: 1px solid var(--line); }
 .round-results th[scope="row"] { font-weight: normal; min-width: 150px; }
+
+.management section { margin: 2.5rem 0; }
+.manage-form { max-width: 42rem; }
+.manage-command, .moderation-story { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--line, #d8d2c6); border-radius: .35rem; }
+.auth-form textarea, .auth-form select { width: 100%; font: inherit; color: inherit; background: transparent; padding: .65rem; border: 1px solid var(--line, #d8d2c6); border-radius: .25rem; }
+.confirmation { display: flex !important; align-items: flex-start; gap: .6rem; }
+.confirmation input { width: auto; flex: 0 0 auto; }
+.admin-details { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
+.moderation-story summary { cursor: pointer; }

@@ -1,3 +1,4 @@
+import { contestManager, adminEvent } from "../management/access";
 import { and, asc, eq } from "drizzle-orm";
 import type { Database } from "../db/connection";
 import { writeTransaction } from "../db/write-transaction";
@@ -7,11 +8,12 @@ import { closurePolicy, POINTS, scoreStories, rankAndQualify, type ClosureSnapsh
 
 export class ClosureError extends Error {}
 // Server/CLI only: no HTTP handler or client import. Local command cannot touch real contests.
-export async function closeFirstRound(db: Database, slug: string) {
-  if (process.env.NODE_ENV !== "development") throw new ClosureError("Локальное закрытие разрешено только в development.");
+export async function closeFirstRound(db: Database, slug: string, managerToken?: string) {
+  if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new ClosureError("Локальное закрытие разрешено только в development.");
   return writeTransaction(db, async (tx): Promise<ClosureSnapshot> => {
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
-    if (!contest?.isDemo) throw new ClosureError("Нужен существующий демонстрационный конкурс.");
+    if (!contest || (managerToken === undefined && !contest.isDemo)) throw new ClosureError("Нужен существующий демонстрационный конкурс.");
+    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
     const [existing] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
     if (existing) return existing.snapshot;
     const now = new Date(); const deadline = firstRoundDeadline(contest);
@@ -73,6 +75,7 @@ export async function closeFirstRound(db: Database, slug: string) {
     else if (groups.length === 1) await tx.update(contests).set({ stage: "completed", votingEndedAt: now }).where(eq(contests.id, contest.id));
     // Multiple groups: frozen finalist list is recorded, final voting is not started automatically.
     await tx.insert(firstRoundClosures).values({ contestId: contest.id, closedAt: now, snapshot });
+    if (actor) await adminEvent(tx, contest.id, actor.id, "closeFirstRound");
     return snapshot;
   });
 }

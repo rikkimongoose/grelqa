@@ -45,6 +45,10 @@ export const contests = sqliteTable("contests", {
   id: id(),
   slug: text("slug").notNull().unique(),
   organizerId: text("organizer_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  coordinatorId: text("coordinator_id").references(() => users.id, { onDelete: "restrict" }),
+  isDraft: integer("is_draft", { mode: "boolean" }).notNull().default(false),
+  publicUpdatedAt: instant("public_updated_at"),
+  settingsRevision: integer("settings_revision").notNull().default(1),
   title: text("title").notNull(),
   description: text("description").notNull(),
   discussionUrl: text("discussion_url"),
@@ -250,3 +254,14 @@ export const contestFinalizations = sqliteTable("contest_finalizations", {
   completedAt: instant("completed_at").notNull(),
   snapshot: text("snapshot", { mode: "json" }).$type<FinalizationSnapshot>().notNull(),
 });
+
+export const contestThemeInvites = sqliteTable("contest_theme_invites", {
+  contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
+  tokenHash: text("token_hash").notNull().unique(), expiresAt: instant("expires_at").notNull(), usedAt: instant("used_at"),
+});
+export const contestAdminEvents = sqliteTable("contest_admin_events", {
+  id: id(), contestId: text("contest_id").notNull().references(() => contests.id, { onDelete: "restrict" }),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "restrict" }),
+  action: text("action").notNull(), details: text("details", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
+  createdAt: instant("created_at").notNull(),
+}, (t) => [index("admin_events_contest").on(t.contestId, t.createdAt)]);

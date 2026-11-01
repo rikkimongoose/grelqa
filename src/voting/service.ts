@@ -1,4 +1,5 @@
 import "server-only";
+import { contestManager, ManagementError } from "../management/access";
 import { randomUUID, createHash } from "node:crypto";
 import { and, asc, eq, gt, isNotNull } from "drizzle-orm";
 import { writeTransaction } from "../db/write-transaction";
@@ -119,9 +120,10 @@ export async function changeBallot(token: string | undefined, action: "draft" | 
 
 export async function coordinatorVotingStatuses(token: string | undefined, slug: string, round: 1 | 2 = 1) {
   return votingTransaction(async (tx) => {
-    const user = await verified(tx, token);
+    await verified(tx, token);
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
-    if (!contest || contest.organizerId !== user.id) throw new AuthError("Доступ запрещён.", 403);
+    if (!contest) throw new AuthError("Доступ запрещён.", 403);
+    try { await contestManager(tx, token || "", contest); } catch (e) { if (e instanceof ManagementError) throw new AuthError(e.message, e.status); throw e; }
     if (round === 1) await refreshRoundOneExemptions(tx, contest.id); else await refreshRoundTwoExemptions(tx, contest.id);
     const [closed] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
     if (round === 1 && closed) return closed.snapshot.audit.members.map((member) => ({ participationId: member.id, status: member.votingStatus }));

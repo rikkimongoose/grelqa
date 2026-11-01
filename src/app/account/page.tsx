@@ -12,6 +12,7 @@ export default async function AccountPage() {
   const ownResults = await ownFirstRoundResults(user.id);
   const votingGroups = await myVotingGroups(user.id);
   return <section className="auth-page"><p className="eyebrow">Ваше пространство</p><h1>Мой кабинет</h1><p>Email подтверждён: {user.email}</p><Link className="button" href="/account/my-stories">Мои работы →</Link>
+    <p><Link href="/manage">Управление конкурсами →</Link></p>
     <section className="open-contests"><h2>Моя группа для голосования</h2>{!votingGroups.length && <p className="muted">Вы ещё не участвуете в конкурсах. После формирования групп здесь появится назначение.</p>}
       {votingGroups.map((group) => <article className="voting-group-card" key={group.slug}><h3><Link href={group.href}>{group.title}{group.assigned ? ` · Группа ${group.number}` : ""}</Link></h3>
         {group.message && <p>{group.message}</p>}{group.waitingPublication && <p className="muted">Назначение сохранено. Состав группы пока не опубликован.</p>}

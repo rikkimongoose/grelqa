@@ -18,9 +18,9 @@ export async function getContestFeed(): Promise<ContestFeed> {
   // Same visibility conditions as the public contest's theme. Never query user/auth data.
   const announcedAt = sql<number>`max(${contests.submissionsStartAt}, ${contestThemes.publishedAt})`;
   const rows = await db.select({ id: contests.id, slug: contests.slug, title: contests.title,
-    theme: contestThemes.theme, announcedAt, completedAt: contestFinalizations.completedAt, outcome: sql<string | null>`json_extract(${contestFinalizations.snapshot}, '$.tally.outcome')`, submissionsEnd: contests.submissionsEndAt,
+    theme: contestThemes.theme, announcedAt, publicUpdatedAt: contests.publicUpdatedAt, completedAt: contestFinalizations.completedAt, outcome: sql<string | null>`json_extract(${contestFinalizations.snapshot}, '$.tally.outcome')`, submissionsEnd: contests.submissionsEndAt,
   }).from(contests).innerJoin(contestThemes, eq(contestThemes.contestId, contests.id)).leftJoin(contestFinalizations, eq(contestFinalizations.contestId, contests.id)).where(and(
-    ne(contests.stage, "preparation"), lte(contests.submissionsStartAt, now), lte(contestThemes.publishedAt, now),
+    eq(contests.isDraft, false), ne(contests.stage, "preparation"), lte(contests.submissionsStartAt, now), lte(contestThemes.publishedAt, now),
   )).orderBy(desc(announcedAt), desc(contests.id)).limit(10);
   const entries = rows.map((row): FeedEntry => {
     const published = new Date(row.announcedAt);
@@ -29,7 +29,7 @@ export async function getContestFeed(): Promise<ContestFeed> {
       id: `urn:grelqa:contest:${createHash("sha256").update(row.id).digest("hex")}`,
       title: row.title, url: new URL(`/contests/${encodeURIComponent(row.slug)}`, siteUrl).href,
       summary: `Тема: ${row.theme}\nОкончание приёма рассказов: ${row.submissionsEnd.toISOString()}${row.completedAt ? `\nКонкурс завершён: ${row.outcome === "failed" ? "не состоялся" : "опубликованы окончательные итоги и публичные имена авторов доступных работ"}.` : ""}`,
-      published, updated: row.completedAt && +row.completedAt > +published ? row.completedAt : published, submissionsEnd: row.submissionsEnd,
+      published, updated: new Date(Math.max(+published, +(row.completedAt ?? published), +(row.publicUpdatedAt ?? published))), submissionsEnd: row.submissionsEnd,
     };
   });
   return { siteUrl, title: "Рваная Грелка — объявления конкурсов", updated: entries.length ? new Date(Math.max(...entries.map((entry) => +entry.updated))) : null, entries };

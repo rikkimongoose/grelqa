@@ -1,3 +1,4 @@
+import { contestManager, adminEvent } from "../management/access";
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import type { Database } from "../db/connection";
@@ -9,11 +10,12 @@ import type { FinalRoundSnapshot } from "./final-round-types";
 export class FinalPreparationError extends Error {}
 // Explicit decision: withdrawal of all final works ends both voting right and duty.
 export const withdrawalRightsPolicy = (): FinalRoundSnapshot["withdrawalRights"] => "revoke";
-export async function prepareFinal(db: Database, slug: string) {
-  if (process.env.NODE_ENV !== "development") throw new FinalPreparationError("Подготовка финала этой командой разрешена только в development.");
+export async function prepareFinal(db: Database, slug: string, managerToken?: string) {
+  if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new FinalPreparationError("Подготовка финала этой командой разрешена только в development.");
   return writeTransaction(db, async (tx) => {
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
-    if (!contest?.isDemo) throw new FinalPreparationError("Нужен демонстрационный конкурс.");
+    if (!contest || (managerToken === undefined && !contest.isDemo)) throw new FinalPreparationError("Нужен демонстрационный конкурс.");
+    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
     const [existing] = await tx.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contest.id));
     if (existing) return existing.snapshot;
     const [closure] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
@@ -40,6 +42,7 @@ export async function prepareFinal(db: Database, slug: string) {
     await tx.insert(finalRounds).values({ contestId: contest.id, groupId, preparedAt: now, snapshot });
     await tx.update(contests).set({ stage: "round-two" }).where(eq(contests.id, contest.id));
     await refreshRoundTwoExemptions(tx, contest.id, now);
+    if (actor) await adminEvent(tx, contest.id, actor.id, "prepareFinal");
     return snapshot;
   });
 }

@@ -14,7 +14,7 @@ async function readableStories(contestSlug: string, storyId?: string, connection
     authorName: publicAuthorName(), id: stories.id, title: stories.title, content: stories.content, length: stories.length,
     contestTitle: contests.title, contestSlug: contests.slug,
   }).from(stories).innerJoin(contests, eq(stories.contestId, contests.id)).where(and(
-    eq(contests.slug, contestSlug),
+    eq(contests.slug, contestSlug), eq(contests.isDraft, false),
     storyId === undefined ? undefined : eq(stories.id, storyId),
     or(and(inArray(contests.stage, ["round-one", "round-two", "completed"]), lte(contests.roundOneStartAt, now), lte(stories.publishedAt, now)),
       and(formedPublication(db), groupedStory(db, stories.id))),
@@ -42,7 +42,7 @@ export async function getPublicStoryGroupContents(contestSlug: string) {
 }
 
 async function readGroups(db: Pick<Database, "select">, contestSlug: string, now: Date) {
-  const [contest] = await db.select({ title: contests.title }).from(contests).where(eq(contests.slug, contestSlug));
+  const [contest] = await db.select({ title: contests.title }).from(contests).where(and(eq(contests.slug, contestSlug), eq(contests.isDraft, false)));
   if (!contest) return undefined;
   const rows = await readableStories(contestSlug, undefined, db, now);
   // Только опубликованные группы. Для финалиста берём последнюю доступную группу,

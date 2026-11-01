@@ -1,3 +1,4 @@
+import { contestManager, adminEvent } from "../management/access";
 import { createHash } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "../db/connection";
@@ -7,11 +8,12 @@ import { closurePolicy, POINTS, scoreStories, rankAndQualify, type ClosureSnapsh
 import type { FinalizationSnapshot } from "./finalization-types";
 
 export class FinalizationError extends Error {}
-export async function finalizeContest(db: Database, slug: string) {
-  if (process.env.NODE_ENV !== "development") throw new FinalizationError("Команда завершения разрешена только в development.");
+export async function finalizeContest(db: Database, slug: string, managerToken?: string) {
+  if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new FinalizationError("Команда завершения разрешена только в development.");
   return writeTransaction(db, async (tx): Promise<FinalizationSnapshot> => {
     const [contest] = await tx.select().from(s.contests).where(eq(s.contests.slug, slug));
-    if (!contest?.isDemo) throw new FinalizationError("Нужен существующий демонстрационный конкурс.");
+    if (!contest || (managerToken === undefined && !contest.isDemo)) throw new FinalizationError("Нужен существующий демонстрационный конкурс.");
+    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
     const [saved] = await tx.select().from(s.contestFinalizations).where(eq(s.contestFinalizations.contestId, contest.id));
     if (saved) return saved.snapshot;
     const [first] = await tx.select().from(s.firstRoundClosures).where(eq(s.firstRoundClosures.contestId, contest.id));
@@ -87,6 +89,7 @@ export async function finalizeContest(db: Database, slug: string) {
       winners: tally.outcome === "results" ? tally.results.filter((r) => !r.withdrawn && r.place === 1).map((r) => r.id) : [] };
     await tx.update(s.contests).set({ stage: tally.outcome === "failed" ? "failed" : "completed", failureReason: tally.failureReason, votingEndedAt: now }).where(eq(s.contests.id, contest.id));
     await tx.insert(s.contestFinalizations).values({ contestId: contest.id, completedAt: now, snapshot });
+    if (actor) await adminEvent(tx, contest.id, actor.id, "finalizeContest");
     return snapshot;
   });
 }

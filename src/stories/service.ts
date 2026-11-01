@@ -1,5 +1,6 @@
+import { withdrawRound } from "./withdrawal";
 import "server-only";
-import { firstRoundDeadline, refreshRoundOneExemptions, refreshRoundTwoExemptions } from "../voting/eligibility";
+import { firstRoundDeadline } from "../voting/eligibility";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, isNotNull, notExists, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
@@ -22,7 +23,7 @@ export function canWithdraw(story: Story, contest: Contest, rounds: (typeof stor
 function beforeGrouping(db: Pick<Database, "select">) {
   return and(
     notExists(db.select({ one: sql`1` }).from(contestGroups).where(eq(contestGroups.contestId, contests.id))),
-    notExists(db.select({ one: sql`1` }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contests.id))),
+    eq(contests.isDraft, false), notExists(db.select({ one: sql`1` }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contests.id))),
   );
 }
 async function groupingStarted(db: Pick<Database, "select">, contestId: string) {
@@ -138,10 +139,8 @@ export async function withdrawStory(sessionToken: string | undefined, id: string
     const reception = withinReception(row.contest, now);
     if (!reception) {
       const round = row.contest.stage === "round-one" ? 1 : 2;
-      await tx.update(storyRounds).set({ status: "withdrawn", withdrawnAt: now, withdrawalReason: "Снята автором" }).where(and(eq(storyRounds.storyId, id), eq(storyRounds.round, round)));
+      await withdrawRound(tx, row.contest.id, id, round, now, "Снята автором");
     }
     await tx.update(stories).set({ ...(reception ? { status: "withdrawn" as const, withdrawnAt: now, withdrawalReason: "Снята автором во время приёма" } : {}), updatedAt: now, revision: revision + 1 }).where(eq(stories.id, id));
-    await refreshRoundOneExemptions(tx, row.contest.id, now);
-    await refreshRoundTwoExemptions(tx, row.contest.id, now);
   });
 }
