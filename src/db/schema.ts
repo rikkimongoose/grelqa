@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
+import type { ClosureSnapshot } from "../contests/closure-rules";
 import type { FirstRoundOutcome } from "../contests/grouping-rules";
 
 export const stages = ["preparation", "submissions", "moderation", "round-one", "round-two", "completed", "failed"] as const;
@@ -221,3 +222,10 @@ export const ballotRequests = sqliteTable("ballot_requests", {
   response: text("response", { mode: "json" }).$type<{ revision: number; message: string; submittedAt: string | null }>().notNull(),
   receivedAt: instant("received_at").notNull(),
 }, (t) => [primaryKey({ columns: [t.participationId, t.requestId] })]);
+
+// Private immutable audit; public queries must project a strict DTO, never serialize snapshot wholesale.
+export const firstRoundClosures = sqliteTable("first_round_closures", {
+  contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
+  closedAt: instant("closed_at").notNull(),
+  snapshot: text("snapshot", { mode: "json" }).$type<ClosureSnapshot>().notNull(),
+});

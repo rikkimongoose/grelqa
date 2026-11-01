@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, ne, notExists, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Database } from "../db/connection";
-import { contests, contestGroups, firstRoundFormations, participations, stories, storyRounds } from "../db/schema";
+import { contests, contestGroups, firstRoundFormations, firstRoundClosures, participations, stories, storyRounds } from "../db/schema";
 import { parseStoryContent } from "../lib/story-content";
 
 export type VotingDb = Pick<Database, "select" | "update">;
@@ -33,6 +33,8 @@ export async function eligibleStories(db: VotingDb, contest: VotingContest, grou
 export async function refreshRoundOneExemptions(db: VotingDb, contestId: string, now = new Date()) {
   const [contest] = await db.select().from(contests).where(eq(contests.id, contestId));
   if (!contest || !["moderation", "round-one"].includes(contest.stage) || +now >= +firstRoundDeadline(contest)) return;
+  const [closure] = await db.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contestId));
+  if (closure) return;
   const members = await db.select().from(participations).where(eq(participations.contestId, contestId));
   for (const member of members) {
     if (!member.assignedGroupId || member.assignedRound !== 1 || (!member.mustVoteRoundOne && !member.roundOneExemptAt)) continue;

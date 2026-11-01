@@ -1,10 +1,10 @@
 import "server-only";
-import { refreshRoundOneExemptions } from "../voting/eligibility";
+import { firstRoundDeadline, refreshRoundOneExemptions } from "../voting/eligibility";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, isNotNull, notExists, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
 import type { Database } from "../db/connection";
-import { authSessions, users, contests, participations, stories, storyRounds, contestGroups, firstRoundFormations } from "../db/schema";
+import { authSessions, users, contests, participations, stories, storyRounds, contestGroups, firstRoundFormations, firstRoundClosures } from "../db/schema";
 import { AuthError, tokenHash } from "../auth/service";
 import { countStoryText, LENGTH_ALGORITHM, lengthError, submissionContent, withinReception } from "../lib/submission";
 
@@ -15,7 +15,7 @@ export function canWithdraw(story: Story, contest: Contest, rounds: (typeof stor
   if (withinReception(contest, now)) return story.status === "submitted" && rounds.length === 0;
   const round = contest.stage === "round-one" ? 1 : contest.stage === "round-two" ? 2 : 0;
   const start = round === 1 ? contest.roundOneStartAt : contest.roundTwoStartAt;
-  return Boolean(round && start && +start <= +now && +now < +contest.endsAt && story.status === "admitted" && rounds.some((entry) => entry.round === round && entry.status === "active"));
+  return Boolean(round && start && +start <= +now && +now < +(round === 1 ? firstRoundDeadline(contest) : contest.endsAt) && story.status === "admitted" && rounds.some((entry) => entry.round === round && entry.status === "active"));
 }
 
 // A saved formation closes submissions even if the stage/dates were changed accidentally.
@@ -65,9 +65,10 @@ export async function ownStory(userId: string, id: string) {
     .innerJoin(contests, eq(stories.contestId, contests.id)).where(and(eq(stories.id, id), eq(participations.userId, userId)));
   if (!row) return undefined;
   const rounds = await db.select().from(storyRounds).where(eq(storyRounds.storyId, id));
+  const [closed] = await db.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, row.contest.id));
   return { story: row.story, contest: { slug: row.contest.slug, title: row.contest.title, minLength: row.contest.minLength, maxLength: row.contest.maxLength },
     editable: withinReception(row.contest) && row.story.status === "submitted" && row.story.publishedAt === null && rounds.length === 0 && !await groupingStarted(db, row.contest.id),
-    withdrawable: canWithdraw(row.story, row.contest, rounds),
+    withdrawable: !(closed && row.contest.stage === "round-one") && canWithdraw(row.story, row.contest, rounds),
     withdrawnRounds: rounds.filter((entry) => entry.status === "withdrawn").map((entry) => entry.round) };
 }
 
@@ -127,6 +128,8 @@ export async function withdrawStory(sessionToken: string | undefined, id: string
       .where(and(eq(stories.id, id), eq(participations.userId, user.id)));
     if (!row) throw new AuthError("Работа не найдена.", 404);
     const rounds = await tx.select().from(storyRounds).where(eq(storyRounds.storyId, id));
+    const [closed] = await tx.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, row.contest.id));
+    if (closed && row.contest.stage === "round-one") throw new AuthError("Первый тур уже закрыт. Его историю нельзя изменить.", 409);
     if (!canWithdraw(row.story, row.contest, rounds, now)) throw new AuthError("На этом этапе или в этом статусе снятие недоступно.", 409);
     if (row.story.revision !== revision) throw new AuthError("Работа уже изменена. Обновите страницу.", 409);
     const reception = withinReception(row.contest, now);

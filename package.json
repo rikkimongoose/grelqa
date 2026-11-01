@@ -30,7 +30,10 @@
     "test:feeds": "node --import tsx --test tests/feeds.test.ts",
     "db:demo-voting": "node --import tsx scripts/demo-voting.ts",
     "test:voting": "node --conditions=react-server --import tsx --test tests/voting.test.ts",
-    "test:voting:browser": "node --import tsx --test tests/voting-browser.test.ts"
+    "test:voting:browser": "node --import tsx --test tests/voting-browser.test.ts",
+    "contest:close-first-round": "node --import tsx scripts/close-first-round.ts",
+    "test:closure": "node --conditions=react-server --import tsx --test tests/closure.test.ts",
+    "db:demo-closure": "node --import tsx scripts/demo-closure.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

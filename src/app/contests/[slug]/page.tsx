@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FirstRoundResults } from "@/components/first-round-results";
 import { StageBadge } from "@/components/stage-badge";
 import { formatDate } from "@/lib/contests";
 import { getPublicContest } from "@/db/public-contests";
@@ -47,6 +48,7 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
       </div>
       <section className="schedule" aria-labelledby="schedule-title"><p className="eyebrow">Шаг за шагом</p><h2 id="schedule-title">Расписание</h2><p className="muted">Все даты — по московскому времени (МСК).</p><ol>{contest.schedule.map((item) => <li key={item.stage} className={item.stage === contest.stage ? "current" : ""} aria-current={item.stage === contest.stage ? "step" : undefined}><span className="schedule-label">{item.label}</span><time dateTime={item.date}>{formatDate(item.date)}</time>{item.stage === contest.stage && <span className="current-label">Текущий этап</span>}</li>)}</ol><p className="schedule-note">{contest.isDemo && "Даты и время приведены для примера. "}Второй тур предусмотрен при нескольких группах; порядок завершения конкурса с одной группой ещё требует уточнения.</p></section>
     </div>
+    <FirstRoundResults slug={slug} />
     <section id="stories" className="contest-stories" aria-labelledby="stories-title">
       <div className="section-heading"><div><p className="eyebrow">Время читать</p><h2 id="stories-title">Рассказы</h2></div></div>
       {receiving ? <>
