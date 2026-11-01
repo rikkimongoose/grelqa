@@ -3,7 +3,7 @@ import { randomBytes, scryptSync } from "node:crypto";
 import { openDatabase, type Database } from "../src/db/connection";
 import * as s from "../src/db/schema";
 import { demoContests } from "./demo-contests";
-import { longDemoStory } from "./demo-stories";
+import { demoStoryTitles, demoStoryContents } from "./demo-stories";
 
 export async function seed(db: Database) {
   const createdAt = new Date("2026-10-01T12:00:00Z");
@@ -37,8 +37,8 @@ export async function seed(db: Database) {
       }).onConflictDoNothing({ target: s.contests.id });
       await tx.insert(s.contestThemes).values({
         contestId,
-        theme: demo.theme ?? "СЕКРЕТНАЯ ДЕМОТЕМА: снег в кармане",
-        conditions: demo.theme ? demo.conditions : ["СЕКРЕТНОЕ ДЕМОУСЛОВИЕ: история начинается со снежинки."],
+        theme: demo.theme ?? "СЕКРЕТНАЯ ДЕМОТЕМА: аккредитация на конец света",
+        conditions: demo.theme ? demo.conditions : ["СЕКРЕТНОЕ ДЕМОУСЛОВИЕ: репортёр прибывает после последнего автобуса."],
         enteredAt: createdAt,
         publishedAt: demo.theme ? new Date(start) : null,
       }).onConflictDoNothing({ target: s.contestThemes.contestId });
@@ -49,7 +49,7 @@ export async function seed(db: Database) {
     await tx.insert(s.contestGroups).values({
       id: groupId, contestId, round: 1, number: 1, capacity: 20, publishedAt,
     }).onConflictDoNothing({ target: s.contestGroups.id });
-    const titles = ["Переулок забытых часов", "Окно на восьмом этаже", "Последний трамвай"];
+    const titles = demoStoryTitles;
     for (let n = 1; n <= 3; n++) {
       const participationId = `demo-city-participant-${n}`;
       const storyId = `demo-city-story-${n}`;
@@ -59,10 +59,7 @@ export async function seed(db: Database) {
       }).onConflictDoNothing({ target: s.participations.id });
       await tx.insert(s.stories).values({
         id: storyId, contestId, participationId, title: titles[n - 1],
-        content: n === 1 ? longDemoStory : [
-          { type: "paragraph", children: [{ text: "На карте этого переулка не было. ", italic: true }, { text: "Но каждый вечер там зажигался свет." }] },
-          { type: "paragraph", children: [{ text: "— Значит, кто-то всё ещё ждёт, — подумала путница.", bold: true }] },
-        ],
+        content: demoStoryContents[n - 1],
         // Это демонстрационные тексты, не допущенные реальной модерацией.
         // Конкурсная длина не вычисляется до согласования алгоритма.
         status: "admitted", createdAt, updatedAt: createdAt, publishedAt,

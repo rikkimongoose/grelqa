@@ -33,7 +33,8 @@
     "test:voting:browser": "node --import tsx --test tests/voting-browser.test.ts",
     "contest:close-first-round": "node --import tsx scripts/close-first-round.ts",
     "test:closure": "node --conditions=react-server --import tsx --test tests/closure.test.ts",
-    "db:demo-closure": "node --import tsx scripts/demo-closure.ts"
+    "db:demo-closure": "node --import tsx scripts/demo-closure.ts",
+    "db:refresh-demo-copy": "node --import tsx scripts/refresh-demo-copy.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

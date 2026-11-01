@@ -67,7 +67,7 @@ test("собранные страницы читают SQLite и не раскр
         if (route === "/" || route === "/contests/letters-to-november") assert.match(body, /Проверка: название из SQLite/);
         if (route === "/contests/winter-notebook") assert.match(body, /Пока между строк/);
         if (route === "/contests/city-between-lines") {
-          assert.match(body, /Переулок забытых часов/);
+          assert.match(body, /Бензин для муниципального апокалипсиса/);
           assert.match(body, /Первый тур · Группа 1/);
           assert.match(body, /Первый тур · Группа 2/);
           assert.match(body, /Публичный рассказ без группы/);
@@ -92,7 +92,7 @@ test("собранные страницы читают SQLite и не раскр
       assert.match(body, /Этот лист пока пуст/);
       assert.ok(response.status === 404 || response.status === 200);
       assert.match(body, /noindex/);
-      assert.doesNotMatch(body, /СКРЫТЫЙ|Переулок забытых часов|Первый абзац|grelqa\.example|demo-user-/);
+      assert.doesNotMatch(body, /СКРЫТЫЙ|Бензин для муниципального апокалипсиса|Первый абзац|grelqa\.example|demo-user-/);
     }
     // Доступ по прямой ссылке закрывается и при изменении этапа конкурса.
     const stageConnection = await openDatabase(env.DATABASE_URL);
@@ -102,7 +102,7 @@ test("собранные страницы читают SQLite и не раскр
         for (const rsc of [false, true]) {
           const response = await fetch(baseUrl + "/contests/city-between-lines/stories/demo-city-story-1", { headers: rsc ? { RSC: "1" } : {} });
           const body = await response.text();
-          assert.doesNotMatch(body, /Переулок забытых часов|Первый абзац|<script>alert/);
+          assert.doesNotMatch(body, /Бензин для муниципального апокалипсиса|Первый абзац|<script>alert/);
           assert.match(body, rsc ? /404/ : /Этот лист пока пуст/);
         }
       }
