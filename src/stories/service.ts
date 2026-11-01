@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, gt, isNotNull, notExists, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
 import type { Database } from "../db/connection";
-import { authSessions, users, contests, participations, stories, storyRounds, contestGroups, firstRoundFormations, firstRoundClosures } from "../db/schema";
+import { authSessions, users, contests, participations, stories, storyRounds, contestGroups, firstRoundFormations, firstRoundClosures, contestFinalizations } from "../db/schema";
 import { AuthError, tokenHash } from "../auth/service";
 import { countStoryText, LENGTH_ALGORITHM, lengthError, submissionContent, withinReception } from "../lib/submission";
 
@@ -66,9 +66,10 @@ export async function ownStory(userId: string, id: string) {
   if (!row) return undefined;
   const rounds = await db.select().from(storyRounds).where(eq(storyRounds.storyId, id));
   const [closed] = await db.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, row.contest.id));
+  const [completed] = await db.select({ id: contestFinalizations.contestId }).from(contestFinalizations).where(eq(contestFinalizations.contestId, row.contest.id));
   return { story: row.story, contest: { slug: row.contest.slug, title: row.contest.title, minLength: row.contest.minLength, maxLength: row.contest.maxLength },
     editable: withinReception(row.contest) && row.story.status === "submitted" && row.story.publishedAt === null && rounds.length === 0 && !await groupingStarted(db, row.contest.id),
-    withdrawable: !(closed && row.contest.stage === "round-one") && canWithdraw(row.story, row.contest, rounds),
+    withdrawable: !completed && !(closed && row.contest.stage === "round-one") && canWithdraw(row.story, row.contest, rounds),
     withdrawnRounds: rounds.filter((entry) => entry.status === "withdrawn").map((entry) => entry.round) };
 }
 
@@ -129,6 +130,8 @@ export async function withdrawStory(sessionToken: string | undefined, id: string
     if (!row) throw new AuthError("Работа не найдена.", 404);
     const rounds = await tx.select().from(storyRounds).where(eq(storyRounds.storyId, id));
     const [closed] = await tx.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, row.contest.id));
+    const [completed] = await tx.select({ id: contestFinalizations.contestId }).from(contestFinalizations).where(eq(contestFinalizations.contestId, row.contest.id));
+    if (completed) throw new AuthError("Конкурс уже завершён. Его историю нельзя изменить.", 409);
     if (closed && row.contest.stage === "round-one") throw new AuthError("Первый тур уже закрыт. Его историю нельзя изменить.", 409);
     if (!canWithdraw(row.story, row.contest, rounds, now)) throw new AuthError("На этом этапе или в этом статусе снятие недоступно.", 409);
     if (row.story.revision !== revision) throw new AuthError("Работа уже изменена. Обновите страницу.", 409);

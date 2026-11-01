@@ -1,4 +1,5 @@
 import "server-only";
+import { publicAuthorName } from "./author-publication";
 import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { formedPublication, groupedStory, groupPublication } from "./story-publication";
 import { getDatabase } from "./index";
@@ -10,7 +11,7 @@ import { parseStoryContent, storyVolume } from "../lib/story-content";
 async function readableStories(contestSlug: string, storyId?: string, connection?: Pick<Database, "select">, now = new Date()) {
   const db = connection ?? (await getDatabase()).db;
   return db.select({
-    id: stories.id, title: stories.title, content: stories.content, length: stories.length,
+    authorName: publicAuthorName(), id: stories.id, title: stories.title, content: stories.content, length: stories.length,
     contestTitle: contests.title, contestSlug: contests.slug,
   }).from(stories).innerJoin(contests, eq(stories.contestId, contests.id)).where(and(
     eq(contests.slug, contestSlug),
@@ -32,7 +33,7 @@ export async function getPublicStory(contestSlug: string, storyId: string) {
   const content = parseStoryContent(row.content);
   if (!content) return undefined;
   return { id: row.id, title: row.title, contestTitle: row.contestTitle, contestSlug: row.contestSlug,
-    content, volume: storyVolume(content, row.length) };
+    authorName: row.authorName, content, volume: storyVolume(content, row.length) };
 }
 
 export async function getPublicStoryGroupContents(contestSlug: string) {
@@ -55,7 +56,7 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
       groupPublication(db, now),
     )).orderBy(asc(contestGroups.round), asc(contestGroups.number)) : [];
   const byStory = new Map(assignments.map((item) => [item.storyId, item]));
-  type Summary = { id: string; title: string; volume: string; content: NonNullable<ReturnType<typeof parseStoryContent>> };
+  type Summary = { authorName: string | null; id: string; title: string; volume: string; content: NonNullable<ReturnType<typeof parseStoryContent>> };
   const groups = new Map<string, { key: string; title: string; round: number; number: number; stories: Summary[] }>();
   // Опубликованный якорь группы сохраняется, даже если все её работы сняты.
   const publishedGroups = await db.select({ id: contestGroups.id, round: contestGroups.round, number: contestGroups.number }).from(contestGroups)
@@ -73,7 +74,7 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
       title: assignment ? `${assignment.round === 1 ? "Первый тур" : "Финал"} · Группа ${assignment.number}` : "Рассказы без опубликованной группы",
       round: assignment?.round ?? 3, number: assignment?.number ?? 0, stories: [],
     };
-    group.stories.push({ id: row.id, title: row.title, volume: storyVolume(content, row.length), content });
+    group.stories.push({ authorName: row.authorName, id: row.id, title: row.title, volume: storyVolume(content, row.length), content });
     groups.set(key, group);
   }
   return { title: contest.title, groups: [...groups.values()].sort((a, b) => a.round - b.round || a.number - b.number) };
@@ -81,5 +82,5 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
 
 export async function getPublicStoryGroups(contestSlug: string) {
   const snapshot = await getPublicStoryGroupContents(contestSlug);
-  return snapshot?.groups.map((group) => ({ ...group, stories: group.stories.map(({ id, title, volume }) => ({ id, title, volume })) })) ?? [];
+  return snapshot?.groups.map((group) => ({ ...group, stories: group.stories.map(({ id, title, volume, authorName }) => ({ id, title, volume, authorName })) })) ?? [];
 }

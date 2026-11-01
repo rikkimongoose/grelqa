@@ -5,7 +5,7 @@ function escapeText(text: string) {
     .replace(/[\\`*_{}\[\]()#+.!|~\-]/g, "\\$&");
 }
 
-export function storyMarkdown(title: string, content: StoryContent) {
+export function storyMarkdown(title: string, content: StoryContent, authorName?: string | null) {
   const paragraphs = content.map((paragraph) => {
     const lines: { text: string; bold?: boolean; italic?: boolean }[][] = [[]];
     for (const fragment of paragraph.children) {
@@ -24,5 +24,5 @@ export function storyMarkdown(title: string, content: StoryContent) {
       return escapeText(match[1]) + (match[2] ? marker + escapeText(match[2]) + marker : "") + escapeText(match[3]);
     }).join("").replace(/^[ \t]+/, (spaces) => [...spaces].map((char) => char === "\t" ? "&#9;" : "&#32;").join(""))).join("  \n");
   });
-  return `# ${escapeText(title.replace(/[\r\n]+/g, " "))}\n\n${paragraphs.join("\n\n")}\n`;
+  return `# ${escapeText(title.replace(/[\r\n]+/g, " "))}\n\n${authorName ? `Автор: ${escapeText(authorName.replace(/[\r\n]+/g, " "))}\n\n` : ""}${paragraphs.join("\n\n")}\n`;
 }

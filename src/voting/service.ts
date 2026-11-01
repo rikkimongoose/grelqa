@@ -3,7 +3,7 @@ import { randomUUID, createHash } from "node:crypto";
 import { and, asc, eq, gt, isNotNull } from "drizzle-orm";
 import { writeTransaction } from "../db/write-transaction";
 import { getDatabase } from "../db";
-import { authSessions, users, contests, participations, ballots, ballotEntries, ballotDrafts, ballotRequests, stories, firstRoundClosures, finalRounds } from "../db/schema";
+import { authSessions, users, contests, participations, ballots, ballotEntries, ballotDrafts, ballotRequests, stories, firstRoundClosures, finalRounds, contestFinalizations } from "../db/schema";
 import { AuthError, tokenHash } from "../auth/service";
 import { eligibleStories, firstRoundDeadline, firstRoundOpen, finalRoundOpen, refreshRoundOneExemptions, refreshRoundTwoExemptions, type VotingDb } from "./eligibility";
 
@@ -27,8 +27,9 @@ async function context(tx: Tx, token: string | undefined, slug: string, round: 1
   const [member] = await tx.select().from(participations).where(and(eq(participations.contestId, contest.id), eq(participations.userId, user.id)));
   const [closure] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
   const [final] = round === 2 ? await tx.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contest.id)) : [];
+  const [completed] = await tx.select({ snapshot: contestFinalizations.snapshot }).from(contestFinalizations).where(eq(contestFinalizations.contestId, contest.id));
   if (round === 1 && (!member?.assignedGroupId || member.assignedRound !== 1 || (!member.mustVoteRoundOne && !member.roundOneExemptAt))) throw new AuthError("У вас нет назначения для голосования в первом туре.", 403);
-  if (round === 2 && (!member || !closure || closure.snapshot.outcome !== "results" || closure.snapshot.settings.singleRound || !final || !final.snapshot.members.some((owner) => owner.participationId === member.id && owner.userId === user.id) || contest.stage === "failed")) throw new AuthError("Финальное голосование доступно только авторам работ из зафиксированного состава финала после подготовки тура.", 403);
+  if (round === 2 && (!member || !closure || closure.snapshot.outcome !== "results" || closure.snapshot.settings.singleRound || !final || !final.snapshot.members.some((owner) => owner.participationId === member.id && owner.userId === user.id) || (contest.stage === "failed" && !completed))) throw new AuthError("Финальное голосование доступно только авторам работ из зафиксированного состава финала после подготовки тура.", 403);
   if (!member) throw new AuthError("Нет участия в конкурсе.", 403);
   const groupId = round === 1 ? member.assignedGroupId! : final!.snapshot.groupId;
   const available = await eligibleStories(tx, contest, groupId, user.id, new Date(), round);
@@ -37,7 +38,7 @@ async function context(tx: Tx, token: string | undefined, slug: string, round: 1
   const [draft] = await tx.select().from(ballotDrafts).where(and(eq(ballotDrafts.participationId, member.id), eq(ballotDrafts.round, round)));
   const [sent] = await tx.select().from(ballots).where(and(eq(ballots.participationId, member.id), eq(ballots.round, round)));
   const entries = sent?.submittedAt ? await tx.select({ id: ballotEntries.storyId, position: ballotEntries.position }).from(ballotEntries).where(eq(ballotEntries.ballotId, sent.id)).orderBy(asc(ballotEntries.position)) : [];
-  return { user, contest, member, available, draft, sent, entries, groupId, blockedMessage, rightsEnded, preparedAt: final?.snapshot.preparedAt, closed: round === 1 && Boolean(closure), closedSnapshot: closure?.snapshot };
+  return { user, contest, member, available, draft, sent, entries, groupId, blockedMessage, rightsEnded, preparedAt: final?.snapshot.preparedAt, closed: round === 1 ? Boolean(closure) : Boolean(completed), closedSnapshot: round === 1 ? closure?.snapshot : completed?.snapshot.tally };
 
 }
 
@@ -45,8 +46,8 @@ export async function myBallot(token: string | undefined, slug: string, round: 1
   return votingTransaction(async (tx) => {
     const state = await context(tx, token, slug, round);
     const { contest, member, available, draft, sent, entries } = state;
-    const frozen = round === 1 ? state.closedSnapshot : undefined;
-    const required = frozen ? Math.min(6, frozen.audit.stories.filter((story) => story.groupId === member.assignedGroupId && story.userId !== state.user.id && story.status === "admitted" && story.roundStatus === "active" && !story.globalWithdrawn).length) : Math.min(6, available.length);
+    const frozen = state.closedSnapshot;
+    const required = frozen ? Math.min(6, frozen.audit.stories.filter((story) => story.groupId === state.groupId && story.userId !== state.user.id && story.status === "admitted" && story.roundStatus === "active" && !story.globalWithdrawn).length) : Math.min(6, available.length);
     const ids = new Set(available.map((story) => story.id));
     const visible = new Map(available.map((story) => [story.id, story.title]));
     // Only titles already present in this owner's selections; no authors or foreign votes.
@@ -124,6 +125,8 @@ export async function coordinatorVotingStatuses(token: string | undefined, slug:
     if (round === 1) await refreshRoundOneExemptions(tx, contest.id); else await refreshRoundTwoExemptions(tx, contest.id);
     const [closed] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
     if (round === 1 && closed) return closed.snapshot.audit.members.map((member) => ({ participationId: member.id, status: member.votingStatus }));
+    const [completed] = await tx.select({ snapshot: contestFinalizations.snapshot }).from(contestFinalizations).where(eq(contestFinalizations.contestId, contest.id));
+    if (round === 2 && completed) return completed.snapshot.tally.audit.members.map((m) => ({ participationId: m.id, status: m.votingStatus }));
     const members = await tx.select().from(participations).where(eq(participations.contestId, contest.id));
     const sent = await tx.select({ participationId: ballots.participationId, submittedAt: ballots.submittedAt }).from(ballots).where(and(eq(ballots.contestId, contest.id), eq(ballots.round, round)));
     return members.map((member) => ({ participationId: member.id,

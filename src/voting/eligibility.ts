@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Database } from "../db/connection";
-import { contests, contestGroups, firstRoundFormations, firstRoundClosures, finalRounds, participations, stories, storyRounds } from "../db/schema";
+import { contestFinalizations, contests, contestGroups, firstRoundFormations, firstRoundClosures, finalRounds, participations, stories, storyRounds } from "../db/schema";
 import { parseStoryContent } from "../lib/story-content";
 
 export type VotingDb = Pick<Database, "select" | "update">;
@@ -53,6 +53,8 @@ export async function refreshRoundTwoExemptions(db: VotingDb, contestId: string,
   if (!contest || !["round-two", "completed"].includes(contest.stage)) return;
   const [final] = await db.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contestId));
   if (!final) return;
+  const [completed] = await db.select({ id: contestFinalizations.contestId }).from(contestFinalizations).where(eq(contestFinalizations.contestId, contestId));
+  if (completed) return;
   const ownWorks = await db.select({ participationId: stories.participationId, status: storyRounds.status, withdrawnAt: storyRounds.withdrawnAt, storyStatus: stories.status, globalWithdrawnAt: stories.withdrawnAt }).from(storyRounds)
     .innerJoin(stories, eq(storyRounds.storyId, stories.id)).where(and(eq(storyRounds.contestId, contestId), eq(storyRounds.groupId, final.snapshot.groupId), eq(storyRounds.round, 2), inArray(stories.id, final.snapshot.storyIds)));
   for (const owner of final.snapshot.members) {

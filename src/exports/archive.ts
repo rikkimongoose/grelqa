@@ -3,8 +3,8 @@ import type { StoryContent } from "../db/schema";
 import { storyFilenames } from "./filenames";
 import { storyMarkdown } from "./markdown";
 
-export const EXPORT_VERSION = "public-markdown-v1";
-export type ExportGroup = { key: string; round: number; number: number; stories: { id: string; title: string; content: StoryContent }[] };
+export const EXPORT_VERSION = "public-markdown-v2";
+export type ExportGroup = { key: string; round: number; number: number; stories: { authorName?: string | null; id: string; title: string; content: StoryContent }[] };
 export function archiveEntries(groups: ExportGroup[], singleGroup: boolean) {
   const numbers = groups.filter((g) => g.key !== "ungrouped").map((g) => g.number);
   const repeated = new Set(numbers.filter((n, i) => numbers.indexOf(n) !== i));
@@ -13,7 +13,7 @@ export function archiveEntries(groups: ExportGroup[], singleGroup: boolean) {
     const folder = group.key === "ungrouped" ? "Без группы" : repeated.has(group.number) ? `${group.round === 1 ? "Первый тур" : "Финал"}/${group.number}` : String(group.number);
     return group.stories.map((story, index) => ({
       path: `${singleGroup ? "" : folder + "/"}${names[index]}`,
-      text: storyMarkdown(story.title, story.content),
+      text: storyMarkdown(story.title, story.content, story.authorName),
     }));
   });
 }

@@ -38,7 +38,10 @@
     "contest:prepare-final": "node --import tsx scripts/prepare-final.ts",
     "db:demo-final": "node --import tsx scripts/demo-final.ts",
     "test:final-voting": "node --conditions=react-server --import tsx --test tests/final-voting.test.ts tests/final-rights-migration.test.ts",
-    "test:final-voting:browser": "node --import tsx --test tests/final-voting-browser.test.ts"
+    "test:final-voting:browser": "node --import tsx --test tests/final-voting-browser.test.ts",
+    "contest:finalize": "node --import tsx scripts/finalize-contest.ts",
+    "db:demo-completion": "node --import tsx scripts/demo-completion.ts",
+    "test:finalization": "node --conditions=react-server --import tsx --test tests/finalization.test.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

@@ -1,4 +1,5 @@
 import "server-only";
+import { getPublicStoryGroups } from "../db/public-stories";
 import { eq } from "drizzle-orm";
 import { getDatabase } from "../db";
 import { contests, firstRoundClosures, participations } from "../db/schema";
@@ -17,14 +18,15 @@ export async function publicFirstRoundResults(slug: string) {
   const [row] = await db.select({ snapshot: firstRoundClosures.snapshot, stage: contests.stage }).from(firstRoundClosures)
     .innerJoin(contests, eq(firstRoundClosures.contestId, contests.id)).where(eq(contests.slug, slug));
   if (!row || ["preparation", "submissions"].includes(row.stage)) return undefined;
-  const { snapshot } = row; const failed = snapshot.outcome === "failed" || row.stage === "failed";
+  const { snapshot } = row; const failed = snapshot.outcome === "failed";
+  const readable = new Set((await getPublicStoryGroups(slug)).flatMap((g) => g.stories.map((s) => s.id)));
   // Explicit DTO: no audit, user/participation IDs, ballots, vote counts or unpublished drafts.
   return { closedAt: snapshot.closedAt, failed, failureMessage: failed ? publicFailureMessage(snapshot.failureReason) : null,
     singleRound: snapshot.settings.singleRound, quota: snapshot.settings.quota,
     groups: snapshot.groups.map((group) => ({ key: group.id, number: group.number,
       stories: snapshot.results.filter((item) => item.groupId === group.id)
         .sort((a, b) => (a.place ?? Infinity) - (b.place ?? Infinity))
-        .map((item) => publicRow(item, failed)),
+        .map((item) => ({ ...publicRow(item, failed), readable: !failed && readable.has(item.id) })),
     })),
   };
 }

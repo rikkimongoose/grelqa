@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FinalResults } from "@/components/final-results";
 import { FirstRoundResults } from "@/components/first-round-results";
 import { StageBadge } from "@/components/stage-badge";
 import { formatDate } from "@/lib/contests";
@@ -49,8 +50,9 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
         <section className="conditions" aria-labelledby="conditions-title"><h2 id="conditions-title">Условия</h2><p className="length detail-length">{contest.length}</p><ul>{contest.conditions.map((condition) => <li key={condition}>{condition}</li>)}</ul></section>
         <aside className="demo-note">{contest.isDemo && <strong>Это демонстрационный конкурс.</strong>}<p>{contest.isDemo && "Данные вымышлены. "}Текущий этап задан вручную. Голосование первого тура доступно назначенным участникам на странице «Мой бюллетень».</p></aside>
       </div>
-      <section className="schedule" aria-labelledby="schedule-title"><p className="eyebrow">Шаг за шагом</p><h2 id="schedule-title">Расписание</h2><p className="muted">Все даты — по московскому времени (МСК).</p><ol>{contest.schedule.map((item) => <li key={item.stage} className={item.stage === contest.stage ? "current" : ""} aria-current={item.stage === contest.stage ? "step" : undefined}><span className="schedule-label">{item.label}</span><time dateTime={item.date}>{formatDate(item.date)}</time>{item.stage === contest.stage && <span className="current-label">Текущий этап</span>}</li>)}</ol><p className="schedule-note">{contest.isDemo && "Даты и время приведены для примера. "}Второй тур предусмотрен при нескольких группах; порядок завершения конкурса с одной группой ещё требует уточнения.</p></section>
+      <section className="schedule" aria-labelledby="schedule-title"><p className="eyebrow">Шаг за шагом</p><h2 id="schedule-title">Расписание</h2><p className="muted">Все даты — по московскому времени (МСК).</p><ol>{contest.schedule.map((item) => <li key={item.stage} className={item.stage === contest.stage ? "current" : ""} aria-current={item.stage === contest.stage ? "step" : undefined}><span className="schedule-label">{item.label}</span><time dateTime={item.date}>{formatDate(item.date)}</time>{item.stage === contest.stage && <span className="current-label">Текущий этап</span>}</li>)}</ol><p className="schedule-note">{contest.isDemo && "Даты и время приведены для примера. "}Второй тур предусмотрен при нескольких группах; при одной группе её результаты становятся окончательными после завершения конкурса.</p></section>
     </div>
+    <FinalResults slug={slug} />
     <FirstRoundResults slug={slug} />
     {finalStatus && <aside className="submission-action"><h2>Финальное голосование</h2><p>До <time dateTime={finalStatus.end}>{formatDate(finalStatus.end)}</time> (МСК, UTC+3).</p><p>Финальные рассказы доступны для чтения без регистрации. Голосовать могут только авторы финалистов с подтверждённым email.</p>
       {finalBallot ? <><Link className="button" href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>{finalBallot.open && !finalBallot.exempt ? "Голосовать в финале" : "Мой финальный бюллетень"}</Link>{finalBallot.exempt && <p>Вы освобождены: нет доступных чужих финальных работ.</p>}{finalBallot.blockedMessage && <p>{finalBallot.blockedMessage}</p>}</> : <p>{!user ? "Чтобы голосовать, войдите в подтверждённую учётную запись автора финалиста." : !user.emailVerifiedAt ? <Link href="/registration-status">Подтвердите email, чтобы проверить доступ к финальному голосованию.</Link> : "У этой учётной записи нет права финального голоса. Чтение доступно."}</p>}
@@ -74,7 +76,7 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
         <p className="muted">Чтение доступно без регистрации. Справочный объём, отмеченный знаком ≈, не является конкурсным подсчётом.</p>
         {groups.map((group) => <section className="story-group" id={`group-${group.key}`} key={group.key} aria-label={group.title}>
           <h3>{group.title}</h3>{group.round === 2 && finalBallot && <p><Link href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>Мой финальный бюллетень →</Link></p>}{ballot?.groupId === group.key && <p><Link href={`/contests/${encodeURIComponent(slug)}/ballot`}>Мой бюллетень →</Link>{ballot.exempt && " · Вы освобождены от голосования"}</p>}{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
-            <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}</p></div>
+            <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}{story.authorName && ` · ${story.authorName}`}</p></div>
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>
         </section>)}

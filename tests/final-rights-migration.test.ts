@@ -36,14 +36,18 @@ test("миграция принятого правила: старый фина�
     for (const entry of journal.entries) await copyFile(`drizzle/${entry.tag}.sql`, path.join(oldFolder, `${entry.tag}.sql`));
     await migrate(legacy.db, { migrationsFolder: oldFolder });
     const tables = ["users", "contests", "contest_themes", "contest_groups", "participations", "stories", "story_rounds", "ballots", "ballot_entries", "ballot_drafts", "ballot_requests", "first_round_formations", "first_round_closures", "final_rounds"];
+    const oldColumns = new Map<string, string[]>();
     for (const table of tables) {
       const names = (await legacy.client.execute(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
+      oldColumns.set(table, names);
       for (const row of (await fixture.client.execute(`SELECT ${names.join(",")} FROM ${table} ORDER BY rowid`)).rows) await legacy.client.execute({ sql: `INSERT INTO ${table} (${names.join(",")}) VALUES (${names.map(() => "?").join(",")})`, args: names.map((_, i) => row[i]) });
     }
     const preservedTables = tables.filter((table) => table !== "participations");
-    const before = await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows));
+    const before = await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT ${oldColumns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
     await migrate(legacy.db, { migrationsFolder: "drizzle" }); await migrate(legacy.db, { migrationsFolder: "drizzle" });
-    assert.deepEqual(await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT * FROM ${table} ORDER BY rowid`)).rows)), before);
+    assert.deepEqual(await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT ${oldColumns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows)), before);
+    assert.ok((await legacy.db.select({ name: s.users.publicName }).from(s.users)).every((row) => row.name === null));
+    assert.deepEqual(await legacy.db.select().from(s.contestFinalizations), []);
     const [member] = await legacy.db.select().from(s.participations).where(eq(s.participations.id, memberId));
     assert.equal(member.mustVoteRoundTwo, false); assert.equal(+member.roundTwoRightsEndedAt!, +removedAt); assert.equal(member.roundTwoExemptAt, null); assert.equal(member.roundTwoExemptReason, null);
     assert.equal(member.mustVoteRoundOne, true); assert.equal(member.assignedRound, 1); assert.equal(member.assignedGroupId, `${root}-group-1`);

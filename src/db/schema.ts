@@ -1,3 +1,4 @@
+import type { FinalizationSnapshot } from "../contests/finalization-types";
 import { sql } from "drizzle-orm";
 import { check, foreignKey, index, integer, primaryKey, sqliteTable, text, unique, uniqueIndex } from "drizzle-orm/sqlite-core";
 import type { FinalRoundSnapshot } from "../contests/final-round-types";
@@ -11,6 +12,7 @@ const roundCheck = (value: unknown) => sql`${value} in (1, 2)`;
 
 export const users = sqliteTable("users", {
   id: id(),
+  publicName: text("public_name"),
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash").notNull(),
   emailVerifiedAt: instant("email_verified_at"),
@@ -240,4 +242,11 @@ export const finalRounds = sqliteTable("final_rounds", {
   groupId: text("group_id").notNull().unique().references(() => contestGroups.id, { onDelete: "restrict" }),
   preparedAt: instant("prepared_at").notNull(),
   snapshot: text("snapshot", { mode: "json" }).$type<FinalRoundSnapshot>().notNull(),
+});
+
+// Final publication barrier: results, withdrawals and author disclosure commit together.
+export const contestFinalizations = sqliteTable("contest_finalizations", {
+  contestId: text("contest_id").primaryKey().references(() => contests.id, { onDelete: "restrict" }),
+  completedAt: instant("completed_at").notNull(),
+  snapshot: text("snapshot", { mode: "json" }).$type<FinalizationSnapshot>().notNull(),
 });
