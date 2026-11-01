@@ -17,6 +17,7 @@ export const contestSettings = z.object({
   const d = v.submissionsStartAt.toISOString();
   if (!d.endsWith("T12:00:00.000Z")) ctx.addIssue({ code: "custom", message: "Начало приёма — 15:00 МСК.", path: ["submissionsStartAt"] });
   if (!(+v.submissionsStartAt < +v.submissionsEndAt && +v.submissionsEndAt <= +v.roundOneStartAt && +v.roundOneStartAt < +v.endsAt && (!v.roundTwoStartAt || (+v.roundOneStartAt < +v.roundTwoStartAt && +v.roundTwoStartAt < +v.endsAt)))) ctx.addIssue({ code: "custom", message: "Нарушен порядок этапов." });
+  if (!v.roundTwoStartAt) ctx.addIssue({ code: "custom", message: "Задайте резервное начало финала: число групп станет известно только после приёма." });
   if (v.maxLength && v.minLength > v.maxLength) ctx.addIssue({ code: "custom", message: "Минимум больше максимума." });
 });
 export type SettingsInput = z.input<typeof contestSettings>;

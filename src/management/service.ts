@@ -1,7 +1,7 @@
 import "server-only";
 import { eventView } from "./event-view";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
-import { and, asc, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { getDatabase } from "../db";
 import { writeTransaction, type WriteTx } from "../db/write-transaction";
 import * as s from "../db/schema";
@@ -177,7 +177,7 @@ export async function managementView(token: string, slug: string) {
     const own = user.id === contest.organizerId;
     const [owner] = own ? await tx.select({ email: s.users.email }).from(s.users).where(eq(s.users.id, contest.organizerId)) : [];
     const [coord] = own && contest.coordinatorId ? await tx.select({ email: s.users.email }).from(s.users).where(eq(s.users.id, contest.coordinatorId)) : [];
-    const works = await tx.select({ id: s.stories.id, title: s.stories.title, content: s.stories.content, status: s.stories.status, length: s.stories.length }).from(s.stories).where(eq(s.stories.contestId, contest.id)).orderBy(asc(s.stories.createdAt));
+    const works = await tx.select({ id: s.stories.id, title: s.stories.title, content: s.stories.content, status: s.stories.status, length: s.stories.length }).from(s.stories).where(and(eq(s.stories.contestId, contest.id), ne(s.stories.status, "draft"))).orderBy(asc(s.stories.createdAt));
     const [theme] = await tx.select({ enteredAt: s.contestThemes.enteredAt }).from(s.contestThemes).where(eq(s.contestThemes.contestId, contest.id));
     const [formation] = await tx.select({ at: s.firstRoundFormations.formedAt }).from(s.firstRoundFormations).where(eq(s.firstRoundFormations.contestId, contest.id));
     const members = await tx.select({ id: s.participations.id, mustOne: s.participations.mustVoteRoundOne, mustTwo: s.participations.mustVoteRoundTwo, exemptOne: s.participations.roundOneExemptAt, exemptTwo: s.participations.roundTwoExemptAt }).from(s.participations).where(eq(s.participations.contestId, contest.id));

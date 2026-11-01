@@ -50,6 +50,7 @@ test("управление: роли, настройки, токены, анон
     await denied(issueThemeInvite(coord, draft)); await denied(contestAction(coord, draft, "publish"));
     assert.equal(await getPublicContest(draft), undefined); assert.ok(!(await getContestFeed()).entries.some((e) => e.url.endsWith(draft)));
     const settings: SettingsInput = { title: "Тестовый конкурс", description: "Описание подготовки", discussionUrl: "https://example.test/discuss", ownerEmail: "management-owner@grelqa.example", coordinatorEmail: "management-coordinator@grelqa.example", submissionsStartAt: "2090-02-01T15:00", submissionsEndAt: "2090-02-02T15:00", roundOneStartAt: "2090-02-03T15:00", roundTwoStartAt: "2090-02-05T15:00", endsAt: "2090-02-06T15:00", minLength: 0, maxLength: 10000, groupCapacity: 3, finalCapacity: 3 };
+    assert.equal(contestSettings.safeParse({ ...settings, roundTwoStartAt: "" }).success, false);
     assert.equal(contestSettings.safeParse({ ...settings, submissionsStartAt: "2090-02-31T15:00" }).success, false);
     await assert.rejects(saveContest(owner, { ...settings, endsAt: "2089-01-01T15:00" }));
     await assert.rejects(saveContest(owner, { ...settings, submissionsStartAt: "2090-02-01T14:00" }));
@@ -84,8 +85,11 @@ test("управление: роли, настройки, токены, анон
     const revoked = await issueThemeInvite(owner, draft); const renewed = await issueThemeInvite(owner, draft);
     await denied(enterTheme(tokenFrom(revoked.link), "Revoked", []), 400);
     assert.ok(renewed.link.includes("#token="));
+    const [sample] = await db.select().from(s.stories).where(eq(s.stories.id, "demo-management-story-1"));
+    await db.insert(s.stories).values({ ...sample, id: "legacy-private-draft", title: "НЕПОДАННЫЙ СКРЫТЫЙ ЧЕРНОВИК", status: "draft" });
     const anonView = await managementView(coord, moderation);
     assert.equal(anonView.works.length, 3);
+    assert.doesNotMatch(JSON.stringify(anonView), /НЕПОДАННЫЙ СКРЫТЫЙ ЧЕРНОВИК|legacy-private-draft/);
     assert.doesNotMatch(JSON.stringify(anonView), /demo-management-author|member-author|password|tokenHash|selections|participationId|userId/);
     await denied(moderateStory(other, moderation, "demo-management-story-1", "admit", "Проверено"));
     await denied(moderateStory(coord, moderation, "demo-management-story-1", "admit", ""), 400);
