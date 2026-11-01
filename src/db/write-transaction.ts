@@ -3,7 +3,9 @@ import type { Database } from "./connection";
 export type WriteTx = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // Shared by ballot acceptance and round finalization. SQLite owns the cross-process lock.
-export async function writeTransaction<T>(db: Database, work: (tx: WriteTx) => Promise<T>): Promise<T> {
+export type TransactionDatabase = Pick<Database, "select" | "insert" | "update" | "delete" | "transaction">;
+
+export async function writeTransaction<T>(db: Pick<Database, "transaction">, work: (tx: WriteTx) => Promise<T>): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try { return await db.transaction(work); }
     catch (error) {

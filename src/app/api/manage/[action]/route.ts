@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
       const v = z.object({ slug, storyId: z.string().min(1).max(200), decision: z.enum(["admit", "reject", "withdraw"]), reason: z.string().trim().min(1).max(2000), confirmed: z.literal(true) }).strict().parse(data);
       return reply(await moderateStory(token, v.slug, v.storyId, v.decision, v.reason));
     }
-    if (["publish", "start-reception", "close-reception", "form", "start-first", "close-first", "prepare-final", "finalize"].includes(action)) {
+    if (["retry-schedule", "publish", "start-reception", "close-reception", "form", "start-first", "close-first", "prepare-final", "finalize"].includes(action)) {
       const v = z.object({ slug, confirmed: z.literal(true) }).strict().parse(data);
       return reply(await contestAction(token, v.slug, action));
     }

@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import "server-only";
 import { and, eq } from "drizzle-orm";
 import { getDatabase } from "../db";
@@ -6,7 +7,7 @@ export async function publicFinalStatus(slug: string) {
   const { db } = await getDatabase();
   const [row] = await db.select({ groupId: finalRounds.groupId, stage: contests.stage, start: contests.roundTwoStartAt, end: contests.endsAt }).from(finalRounds)
     .innerJoin(contests, eq(finalRounds.contestId, contests.id)).where(eq(contests.slug, slug));
-  return row && ["round-two", "completed"].includes(row.stage) ? { groupId: row.groupId, open: row.stage === "round-two" && row.start !== null && +row.start <= Date.now() && Date.now() < +row.end, start: row.start?.toISOString(), end: row.end.toISOString() } : undefined;
+  return row && ["round-two", "completed"].includes(row.stage) ? { groupId: row.groupId, open: row.stage === "round-two" && row.start !== null && +row.start <= +currentTime() && +currentTime() < +row.end, start: row.start?.toISOString(), end: row.end.toISOString() } : undefined;
 }
 export async function myFinalGroups(userId: string) {
   const { db } = await getDatabase();

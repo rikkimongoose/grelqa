@@ -1,24 +1,26 @@
-import { contestManager, adminEvent } from "../management/access";
+import { currentTime } from "../server/clock";
+import type { TransitionAuthority } from "../scheduling/authority";
+import { transitionActor, adminEvent } from "../management/access";
 import { createHash } from "node:crypto";
 import { and, asc, eq, inArray } from "drizzle-orm";
-import type { Database } from "../db/connection";
+import type { TransactionDatabase } from "../db/write-transaction";
 import { writeTransaction } from "../db/write-transaction";
 import * as s from "../db/schema";
 import { closurePolicy, POINTS, scoreStories, rankAndQualify, type ClosureSnapshot, type ClosureStory, type ClosureVote, type ClosureMember } from "./closure-rules";
 import type { FinalizationSnapshot } from "./finalization-types";
 
 export class FinalizationError extends Error {}
-export async function finalizeContest(db: Database, slug: string, managerToken?: string) {
+export async function finalizeContest(db: TransactionDatabase, slug: string, managerToken?: TransitionAuthority) {
   if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new FinalizationError("Команда завершения разрешена только в development.");
   return writeTransaction(db, async (tx): Promise<FinalizationSnapshot> => {
     const [contest] = await tx.select().from(s.contests).where(eq(s.contests.slug, slug));
     if (!contest || (managerToken === undefined && !contest.isDemo)) throw new FinalizationError("Нужен существующий демонстрационный конкурс.");
-    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
+    const actor = await transitionActor(tx, managerToken, contest);
     const [saved] = await tx.select().from(s.contestFinalizations).where(eq(s.contestFinalizations.contestId, contest.id));
     if (saved) return saved.snapshot;
     const [first] = await tx.select().from(s.firstRoundClosures).where(eq(s.firstRoundClosures.contestId, contest.id));
     if (!first) throw new FinalizationError("Сначала требуется закрыть первый тур.");
-    const now = new Date();
+    const now = currentTime();
     let tally: ClosureSnapshot; let round: 1 | 2;
     if (first.snapshot.settings.singleRound || first.snapshot.outcome === "failed") {
       if (+now < +new Date(first.snapshot.deadline) || !["completed", "failed"].includes(contest.stage)) throw new FinalizationError("Единственный тур ещё не закрыт.");
@@ -89,7 +91,7 @@ export async function finalizeContest(db: Database, slug: string, managerToken?:
       winners: tally.outcome === "results" ? tally.results.filter((r) => !r.withdrawn && r.place === 1).map((r) => r.id) : [] };
     await tx.update(s.contests).set({ stage: tally.outcome === "failed" ? "failed" : "completed", failureReason: tally.failureReason, votingEndedAt: now }).where(eq(s.contests.id, contest.id));
     await tx.insert(s.contestFinalizations).values({ contestId: contest.id, completedAt: now, snapshot });
-    if (actor) await adminEvent(tx, contest.id, actor.id, "finalizeContest");
+    if (actor) await adminEvent(tx, contest.id, actor.id, "finalizeContest", { actor: actor.scheduled ? "scheduler" : "account" });
     return snapshot;
   });
 }

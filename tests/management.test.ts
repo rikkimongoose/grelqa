@@ -47,6 +47,7 @@ test("управление: роли, настройки, токены, анон
     const owner = tokens.get("owner")!, coord = tokens.get("coordinator")!, other = tokens.get("author-one")!;
     assert.equal((await managedContests(owner)).rows.length, 2); assert.equal((await managedContests(coord)).rows.length, 2);
     await denied(managementView(other, draft)); await denied(managementView("", draft));
+    await denied(contestAction(owner, draft, "retry-schedule"), 409);
     await denied(issueThemeInvite(coord, draft)); await denied(contestAction(coord, draft, "publish"));
     assert.equal(await getPublicContest(draft), undefined); assert.ok(!(await getContestFeed()).entries.some((e) => e.url.endsWith(draft)));
     const settings: SettingsInput = { title: "Тестовый конкурс", description: "Описание подготовки", discussionUrl: "https://example.test/discuss", ownerEmail: "management-owner@grelqa.example", coordinatorEmail: "management-coordinator@grelqa.example", submissionsStartAt: "2090-02-01T15:00", submissionsEndAt: "2090-02-02T15:00", roundOneStartAt: "2090-02-03T15:00", roundTwoStartAt: "2090-02-05T15:00", endsAt: "2090-02-06T15:00", minLength: 0, maxLength: 10000, groupCapacity: 3, finalCapacity: 3 };
@@ -166,9 +167,10 @@ test("управление: роли, настройки, токены, анон
     assert.equal((await post("form", { slug: moderation, confirmed: true }, false)).status, 403);
     assert.equal((await post("form", { slug: moderation, confirmed: true }, true, "https://foreign.test")).status, 403);
     assert.equal((await post("form", { slug: moderation })).status, 400);
+    assert.equal((await post("retry-schedule", { slug: moderation, confirmed: true, clock: "2099-01-01" })).status, 400);
     assert.equal((await post("publish", { slug: created.slug, confirmed: true, organizerId: "demo-management-author-one" })).status, 400);
     const page = await fetch(base + `/manage/${created.slug}`, { headers: { Cookie: cookie } }); assert.equal(page.status, 200); assert.match(page.headers.get("cache-control")!, /private.*no-store/);
-    const html = await page.text(); assert.match(html, /Журнал/); assert.doesNotMatch(html, /ТЕМА СЕКРЕТ|СКРЫТОЕ УСЛОВИЕ|passwordHash|tokenHash|selections/);
+    const html = await page.text(); assert.match(html, /Журнал/); assert.match(html, /Автоматические переходы/); assert.match(html, /Последний успешный переход/); assert.match(html, /Ближайшее запланированное действие/); assert.doesNotMatch(html, /ТЕМА СЕКРЕТ|СКРЫТОЕ УСЛОВИЕ|passwordHash|tokenHash|selections/);
     const unauth = await fetch(base + `/manage/${draft}`, { redirect: "manual" }); assert.ok([307, 308].includes(unauth.status));
     const themePage = await fetch(base + "/enter-theme"); assert.equal(themePage.status, 200); assert.equal(themePage.headers.get("referrer-policy"), "no-referrer"); assert.match(themePage.headers.get("cache-control")!, /no-store/);
     assert.equal((await fetch(base + `/contests/${draft}`)).status, 404);

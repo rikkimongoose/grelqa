@@ -265,3 +265,12 @@ export const contestAdminEvents = sqliteTable("contest_admin_events", {
   action: text("action").notNull(), details: text("details", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
   createdAt: instant("created_at").notNull(),
 }, (t) => [index("admin_events_contest").on(t.contestId, t.createdAt)]);
+
+export const contestTransitionRuns = sqliteTable("contest_transition_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }), contestId: text("contest_id").notNull().references(() => contests.id, { onDelete: "restrict" }),
+  action: text("action").notNull(), source: text("source", { enum: ["scheduled", "manual"] }).notNull(),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "restrict" }),
+  startedAt: instant("started_at").notNull(), finishedAt: instant("finished_at").notNull(),
+  outcome: text("outcome", { enum: ["success", "blocked", "error"] }).notNull(), message: text("message").notNull(),
+}, (t) => [index("transition_runs_contest").on(t.contestId, t.finishedAt),
+  check("transition_source", sql`${t.source} in ('scheduled','manual')`), check("transition_outcome", sql`${t.outcome} in ('success','blocked','error')`)]);

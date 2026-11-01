@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import { and, asc, eq, inArray, isNull, ne, notExists, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import type { Database } from "../db/connection";
@@ -11,7 +12,7 @@ export function firstRoundOpen(contest: VotingContest, at: Date) {
   return contest.stage === "round-one" && +contest.roundOneStartAt <= +at && +at < +firstRoundDeadline(contest);
 }
 
-export async function eligibleStories(db: VotingDb, contest: VotingContest, groupId: string, userId: string, now = new Date(), round: 1 | 2 = 1) {
+export async function eligibleStories(db: VotingDb, contest: VotingContest, groupId: string, userId: string, now = currentTime(), round: 1 | 2 = 1) {
   const [group] = await db.select().from(contestGroups).where(and(eq(contestGroups.id, groupId), eq(contestGroups.contestId, contest.id), eq(contestGroups.round, round)));
   if (!group || !["moderation", "round-one", "round-two", "completed"].includes(contest.stage)) return [];
   const [formation] = await db.select({ snapshot: firstRoundFormations.snapshot }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contest.id));
@@ -32,9 +33,9 @@ export async function eligibleStories(db: VotingDb, contest: VotingContest, grou
 }
 
 // Called in the same write transaction as formation/withdrawal and before accepting votes.
-export async function refreshRoundOneExemptions(db: VotingDb, contestId: string, now = new Date()) {
+export async function refreshRoundOneExemptions(db: VotingDb, contestId: string, now = currentTime(), initialize = false) {
   const [contest] = await db.select().from(contests).where(eq(contests.id, contestId));
-  if (!contest || !["moderation", "round-one"].includes(contest.stage) || +now >= +firstRoundDeadline(contest)) return;
+  if (!contest || !["moderation", "round-one"].includes(contest.stage) || (!initialize && +now >= +firstRoundDeadline(contest))) return;
   const [closure] = await db.select({ id: firstRoundClosures.contestId }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contestId));
   if (closure) return;
   const members = await db.select().from(participations).where(eq(participations.contestId, contestId));
@@ -48,7 +49,7 @@ export async function refreshRoundOneExemptions(db: VotingDb, contestId: string,
 
 
 export const finalRoundOpen = (contest: VotingContest, at: Date) => contest.stage === "round-two" && contest.roundTwoStartAt !== null && +contest.roundTwoStartAt <= +at && +at < +contest.endsAt;
-export async function refreshRoundTwoExemptions(db: VotingDb, contestId: string, now = new Date()) {
+export async function refreshRoundTwoExemptions(db: VotingDb, contestId: string, now = currentTime(), initialize = false) {
   const [contest] = await db.select().from(contests).where(eq(contests.id, contestId));
   if (!contest || !["round-two", "completed"].includes(contest.stage)) return;
   const [final] = await db.select({ snapshot: finalRounds.snapshot }).from(finalRounds).where(eq(finalRounds.contestId, contestId));
@@ -67,7 +68,7 @@ export async function refreshRoundTwoExemptions(db: VotingDb, contestId: string,
       continue;
     }
     // Revocation follows the withdrawal fact even after the deadline; ordinary zero-choice duty is frozen then.
-    if (contest.stage !== "round-two" || +now >= +contest.endsAt) continue;
+    if (contest.stage !== "round-two" || (!initialize && +now >= +contest.endsAt)) continue;
     const available = await eligibleStories(db, contest, final.snapshot.groupId, owner.userId, now, 2);
     if (!available.length && !member.roundTwoExemptAt) await db.update(participations).set({ mustVoteRoundTwo: false, roundTwoExemptAt: now, roundTwoExemptReason: "no-eligible-stories" }).where(eq(participations.id, member.id));
     if (available.length && member.roundTwoExemptAt) await db.update(participations).set({ mustVoteRoundTwo: true, roundTwoExemptAt: null, roundTwoExemptReason: null }).where(eq(participations.id, member.id));

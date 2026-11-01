@@ -44,7 +44,10 @@
     "test:finalization": "node --conditions=react-server --import tsx --test tests/finalization.test.ts",
     "db:demo-management": "node --import tsx scripts/demo-management.ts",
     "test:management": "node --conditions=react-server --import tsx --test tests/management.test.ts",
-    "test:management:browser": "node --import tsx --test tests/management-browser.test.ts"
+    "test:management:browser": "node --import tsx --test tests/management-browser.test.ts",
+    "schedule:run": "node --import tsx scripts/process-schedule.ts",
+    "test:schedule": "node --conditions=react-server --import tsx --test tests/schedule.test.ts",
+    "db:demo-schedule": "node --import tsx scripts/demo-schedule.ts"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",

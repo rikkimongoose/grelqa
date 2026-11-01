@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import { withdrawRound } from "./withdrawal";
 import "server-only";
 import { firstRoundDeadline } from "../voting/eligibility";
@@ -12,7 +13,7 @@ import { countStoryText, LENGTH_ALGORITHM, lengthError, submissionContent, withi
 type Contest = typeof contests.$inferSelect;
 type Story = typeof stories.$inferSelect;
 
-export function canWithdraw(story: Story, contest: Contest, rounds: (typeof storyRounds.$inferSelect)[], now = new Date()) {
+export function canWithdraw(story: Story, contest: Contest, rounds: (typeof storyRounds.$inferSelect)[], now = currentTime()) {
   if (withinReception(contest, now)) return story.status === "submitted" && rounds.length === 0;
   const round = contest.stage === "round-one" ? 1 : contest.stage === "round-two" ? 2 : 0;
   const start = round === 1 ? contest.roundOneStartAt : contest.roundTwoStartAt;
@@ -33,7 +34,7 @@ async function groupingStarted(db: Pick<Database, "select">, contestId: string) 
 
 export async function receptionContests() {
   const { db } = await getDatabase();
-  const now = new Date();
+  const now = currentTime();
   return db.select({ slug: contests.slug, title: contests.title }).from(contests).where(and(eq(contests.stage, "submissions"), sql`${contests.submissionsStartAt} <= ${+now}`, gt(contests.submissionsEndAt, now), beforeGrouping(db))).orderBy(asc(contests.submissionsStartAt));
 }
 
@@ -85,7 +86,7 @@ export async function saveStory(sessionToken: string | undefined, slug: string, 
   if (!title || Array.from(title).length > 200) throw new AuthError("Название: от 1 до 200 знаков.");
   const length = countStoryText(content);
   return db.transaction(async (tx) => {
-    const now = new Date();
+    const now = currentTime();
     const [user] = await tx.select({ id: users.id }).from(authSessions).innerJoin(users, eq(authSessions.userId, users.id))
       .where(and(eq(authSessions.tokenHash, tokenHash("session", sessionToken || "")), gt(authSessions.expiresAt, now), isNotNull(users.emailVerifiedAt)));
     if (!user) throw new AuthError("Требуется вход с подтверждённым email.", 403);
@@ -121,7 +122,7 @@ export async function saveStory(sessionToken: string | undefined, slug: string, 
 export async function withdrawStory(sessionToken: string | undefined, id: string, revision: number) {
   const { db } = await getDatabase();
   await db.transaction(async (tx) => {
-    const now = new Date();
+    const now = currentTime();
     const [user] = await tx.select({ id: users.id }).from(authSessions).innerJoin(users, eq(authSessions.userId, users.id))
       .where(and(eq(authSessions.tokenHash, tokenHash("session", sessionToken || "")), gt(authSessions.expiresAt, now), isNotNull(users.emailVerifiedAt)));
     if (!user) throw new AuthError("Требуется вход с подтверждённым email.", 403);

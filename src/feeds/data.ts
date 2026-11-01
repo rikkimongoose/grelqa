@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import "server-only";
 import { createHash } from "node:crypto";
 import { and, desc, eq, lte, ne, sql } from "drizzle-orm";
@@ -14,7 +15,7 @@ export type ContestFeed = { siteUrl: string; title: string; updated: Date | null
 export async function getContestFeed(): Promise<ContestFeed> {
   const siteUrl = feedSiteUrl();
   const { db } = await getDatabase();
-  const now = new Date();
+  const now = currentTime();
   // Same visibility conditions as the public contest's theme. Never query user/auth data.
   const announcedAt = sql<number>`max(${contests.submissionsStartAt}, ${contestThemes.publishedAt})`;
   const rows = await db.select({ id: contests.id, slug: contests.slug, title: contests.title,

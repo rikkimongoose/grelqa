@@ -1,3 +1,8 @@
+import { currentTime } from "../server/clock";
+import { actions } from "../scheduling/plan";
+import { executeTransition } from "../scheduling/execute";
+import { processContestSchedule } from "../scheduling/process";
+import { scheduleStatus } from "../scheduling/status";
 import "server-only";
 import { eventView } from "./event-view";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
@@ -8,12 +13,7 @@ import * as s from "../db/schema";
 import { contestSettings } from "./settings";
 import { adminEvent, contestManager, verifiedManager, ManagementError } from "./access";
 import { authConfig } from "../auth/config";
-import { closeReception, formFirstRound } from "../contests/grouping";
-import { closeFirstRound } from "../contests/close-first-round";
-import { prepareFinal } from "../contests/prepare-final";
-import { finalizeContest } from "../contests/finalize";
 import { coordinatorVotingStatuses } from "../voting/service";
-import { firstRoundDeadline } from "../voting/eligibility";
 import { canWithdraw } from "../stories/service";
 import { withdrawRound } from "../stories/withdrawal";
 
@@ -44,7 +44,7 @@ export async function saveContest(token: string, input: unknown, slug?: string, 
       const [theme] = await tx.select({ id: s.contestThemes.contestId }).from(s.contestThemes).where(eq(s.contestThemes.contestId, existing.id));
       if (theme && +value.submissionsStartAt !== +existing.submissionsStartAt) throw new ManagementError("После ввода темы начало приёма не меняется.", 409);
     }
-    if (+value.submissionsStartAt <= Date.now()) throw new ManagementError("Начало приёма должно быть в будущем.");
+    if (+value.submissionsStartAt <= +currentTime()) throw new ManagementError("Начало приёма должно быть в будущем.");
     const [owner] = await tx.select({ id: s.users.id }).from(s.users).where(and(sql`lower(trim(${s.users.email})) = ${value.ownerEmail}`, sql`${s.users.emailVerifiedAt} is not null`));
     const [coordinator] = value.coordinatorEmail ? await tx.select({ id: s.users.id }).from(s.users).where(and(sql`lower(trim(${s.users.email})) = ${value.coordinatorEmail}`, sql`${s.users.emailVerifiedAt} is not null`)) : [];
     if (!owner || (value.coordinatorEmail && !coordinator)) throw new ManagementError("Владелец и координатор должны иметь подтверждённые аккаунты.");
@@ -58,7 +58,7 @@ export async function saveContest(token: string, input: unknown, slug?: string, 
       groupCapacity: value.groupCapacity, finalCapacity: value.finalCapacity, minLength: value.minLength, maxLength: value.maxLength };
     const contestId = existing?.id ?? randomUUID(), contestSlug = existing?.slug ?? `contest-${randomUUID()}`;
     if (existing) await tx.update(s.contests).set({ ...fields, settingsRevision: existing.settingsRevision + 1 }).where(eq(s.contests.id, contestId));
-    else await tx.insert(s.contests).values({ id: contestId, slug: contestSlug, ...fields, stage: "preparation", isDraft: true, createdAt: new Date() });
+    else await tx.insert(s.contests).values({ id: contestId, slug: contestSlug, ...fields, stage: "preparation", isDraft: true, createdAt: currentTime() });
     const auditSettings = (row: typeof fields | typeof s.contests.$inferSelect) => ({ title: row.title, description: row.description, discussionUrl: row.discussionUrl, submissionsStartAt: row.submissionsStartAt.toISOString(), submissionsEndAt: row.submissionsEndAt.toISOString(), roundOneStartAt: row.roundOneStartAt.toISOString(), roundTwoStartAt: row.roundTwoStartAt?.toISOString() ?? null, endsAt: row.endsAt.toISOString(), groupCapacity: row.groupCapacity, finalCapacity: row.finalCapacity, minLength: row.minLength, maxLength: row.maxLength });
     await adminEvent(tx, contestId, user.id, existing ? "settings" : "create", { before: existing ? auditSettings(existing) : null, after: auditSettings(fields), roles: { before: existing ? { ownerId: existing.organizerId, coordinatorId: existing.coordinatorId } : null, after: { ownerId: owner.id, coordinatorId: coordinator?.id ?? null } }, rolesChanged: existing ? existing.organizerId !== owner.id || existing.coordinatorId !== (coordinator?.id ?? null) : true, fields: Object.keys(fields), previousRevision: existing?.settingsRevision ?? null, nextRevision: (existing?.settingsRevision ?? 0) + 1 });
     return { slug: contestSlug };
@@ -82,10 +82,10 @@ export async function issueThemeInvite(token: string, slug: string) {
   const { db } = await getDatabase();
   return writeTransaction(db, async (tx) => {
     const contest = await findContest(tx, slug); const actor = await contestManager(tx, token, contest, true);
-    if (Date.now() > +contest.submissionsStartAt || contest.stage !== "preparation") throw new ManagementError("Срок ввода темы истёк.", 409);
+    if (+currentTime() > +contest.submissionsStartAt || contest.stage !== "preparation") throw new ManagementError("Срок ввода темы истёк.", 409);
     const [theme] = await tx.select({ id: s.contestThemes.contestId }).from(s.contestThemes).where(eq(s.contestThemes.contestId, contest.id));
     if (theme) throw new ManagementError("Тема уже введена. Повторный ввод недоступен.", 409);
-    const secret = randomBytes(32).toString("base64url"); const expiresAt = new Date(Math.min(Date.now() + 7 * 86400_000, +contest.submissionsStartAt));
+    const secret = randomBytes(32).toString("base64url"); const expiresAt = new Date(Math.min(+currentTime() + 7 * 86400_000, +contest.submissionsStartAt));
     await tx.insert(s.contestThemeInvites).values({ contestId: contest.id, tokenHash: inviteHash(secret), expiresAt }).onConflictDoUpdate({ target: s.contestThemeInvites.contestId, set: { tokenHash: inviteHash(secret), expiresAt, usedAt: null } });
     await adminEvent(tx, contest.id, actor.id, "issue-theme-link", { expiresAt: expiresAt.toISOString() });
     return { link: `${authConfig().origin}/enter-theme#token=${secret}`, expiresAt: expiresAt.toISOString() };
@@ -97,7 +97,7 @@ export async function enterTheme(token: string, theme: string, conditions: strin
     const [row] = await tx.select({ invite: s.contestThemeInvites, contest: s.contests }).from(s.contestThemeInvites).innerJoin(s.contests, eq(s.contestThemeInvites.contestId, s.contests.id)).where(eq(s.contestThemeInvites.tokenHash, inviteHash(token)));
     if (!row) throw new ManagementError("Ссылка неверна или отозвана.", 400);
     if (row.invite.usedAt) throw new ManagementError("Ссылка уже использована.", 409);
-    const now = new Date();
+    const now = currentTime();
     if (+now > +row.invite.expiresAt || +now > +row.contest.submissionsStartAt || row.contest.stage !== "preparation") throw new ManagementError("Срок ссылки или ввода темы истёк.", 410);
     if (!theme.trim()) throw new ManagementError("Пустая тема пока не согласована. Введите непустую тему.");
     const [taken] = await tx.select({ id: s.contestThemes.contestId }).from(s.contestThemes).where(eq(s.contestThemes.contestId, row.contest.id));
@@ -112,28 +112,27 @@ export async function enterTheme(token: string, theme: string, conditions: strin
 }
 export async function contestAction(token: string, slug: string, action: string) {
   const { db } = await getDatabase();
-  // The services recheck the session and contest role inside their own atomic transaction.
-  if (action === "form") { const r = await formFirstRound(db, slug, token); if (r.status === "blocked") throw new ManagementError(r.questions.join(" "), 409); return { message: r.status === "failed" ? "Конкурс не состоялся; причина сохранена." : "Группы сформированы и опубликованы." }; }
-  if (action === "close-reception") { await closeReception(db, slug, token); return { message: "Приём закрыт." }; }
-  if (action === "close-first") { await closeFirstRound(db, slug, token); return { message: "Результат первого тура сохранён." }; }
-  if (action === "prepare-final") { await prepareFinal(db, slug, token); return { message: "Финал подготовлен." }; }
-  if (action === "finalize") { await finalizeContest(db, slug, token); return { message: "Окончательный результат сохранён." }; }
+  if (action === "retry-schedule") {
+    const contest = await findContest(db, slug); await contestManager(db, token, contest);
+    if (contest.isDraft) throw new ManagementError("Подготовка ещё не опубликована.", 409);
+    const result = await processContestSchedule(db, slug, token);
+    const error = result.reports.find((r) => r.status === "blocked" || r.status === "error");
+    if (error) throw new ManagementError(error.message, error.status === "blocked" ? 409 : 500);
+    return { message: result.limited ? "Достигнут предел переходов; безопасно повторите запуск." : result.reports.length ? "Все наступившие переходы выполнены." : "Наступивших невыполненных переходов нет." };
+  }
+  if (actions.includes(action as typeof actions[number])) {
+    const result = await executeTransition(db, slug, token, action as typeof actions[number]);
+    if (result.status === "blocked" || result.status === "error") throw new ManagementError(result.message, result.status === "blocked" ? 409 : 500);
+    const messages: Record<string, string> = { "close-reception": "Приём закрыт.", "close-first": "Результат первого тура сохранён.", "prepare-final": "Финал подготовлен.", finalize: "Окончательный результат сохранён." };
+    return { message: result.status === "noop" || action === "form" ? result.message : messages[action] ?? "Действие выполнено. Обновите страницу управления." };
+  }
   return writeTransaction(db, async (tx) => {
     const contest = await findContest(tx, slug); const actor = await contestManager(tx, token, contest, action === "publish");
-    const now = new Date();
+    const now = currentTime();
     if (action === "publish") {
       if (!contest.isDraft) return { message: "Конкурс уже опубликован." };
       if (contest.stage !== "preparation" || +now >= +contest.submissionsStartAt) throw new ManagementError("Опубликуйте подготовку до начала приёма.", 409);
       await tx.update(s.contests).set({ isDraft: false, publicUpdatedAt: now }).where(eq(s.contests.id, contest.id));
-    } else if (action === "start-reception") {
-      if (contest.isDraft || contest.stage !== "preparation" || +now < +contest.submissionsStartAt || +now >= +contest.submissionsEndAt) throw new ManagementError("Начать приём сейчас нельзя.", 409);
-      const [theme] = await tx.select({ entered: s.contestThemes.enteredAt }).from(s.contestThemes).where(eq(s.contestThemes.contestId, contest.id));
-      const late = !theme || +theme.entered > +contest.submissionsStartAt;
-      await tx.update(s.contests).set({ stage: late ? "failed" : "submissions", failureReason: late ? "theme-late" : null, publicUpdatedAt: now }).where(eq(s.contests.id, contest.id));
-    } else if (action === "start-first") {
-      const [formed] = await tx.select({ snapshot: s.firstRoundFormations.snapshot }).from(s.firstRoundFormations).where(eq(s.firstRoundFormations.contestId, contest.id));
-      if (contest.isDraft || contest.stage !== "moderation" || !formed || "kind" in formed.snapshot || +now < +contest.roundOneStartAt || +now >= +firstRoundDeadline(contest)) throw new ManagementError("Начать первый тур сейчас нельзя.", 409);
-      await tx.update(s.contests).set({ stage: "round-one", publicUpdatedAt: now }).where(eq(s.contests.id, contest.id));
     } else throw new ManagementError("Действие не найдено.", 404);
     await adminEvent(tx, contest.id, actor.id, action);
     return { message: "Действие выполнено. Обновите страницу управления." };
@@ -150,7 +149,7 @@ export async function moderateStory(token: string, slug: string, storyId: string
     if (closed) throw new ManagementError("Окончательные результаты уже опубликованы.", 409);
     if (action === "withdraw") {
       const round = contest.stage === "round-one" ? 1 : contest.stage === "round-two" ? 2 : null;
-      const now = new Date();
+      const now = currentTime();
       if (!round) throw new ManagementError("Снятие доступно только в активном туре до дедлайна.", 409);
       const [first] = await tx.select().from(s.firstRoundClosures).where(eq(s.firstRoundClosures.contestId, contest.id));
       if (round === 1 && first) throw new ManagementError("Первый тур уже закрыт.", 409);
@@ -163,10 +162,10 @@ export async function moderateStory(token: string, slug: string, storyId: string
       const [group] = await tx.select({ id: s.contestGroups.id }).from(s.contestGroups).where(eq(s.contestGroups.contestId, contest.id));
       if (contest.isDraft || contest.stage !== "moderation" || formed || group || story.status !== "submitted") throw new ManagementError("Проверять submitted можно на этапе модерации до формирования групп.", 409);
       const status = action === "admit" ? "admitted" : "rejected";
-      await tx.update(s.stories).set({ status, updatedAt: new Date(), revision: story.revision + 1 }).where(eq(s.stories.id, story.id));
+      await tx.update(s.stories).set({ status, updatedAt: currentTime(), revision: story.revision + 1 }).where(eq(s.stories.id, story.id));
       await adminEvent(tx, contest.id, actor.id, "moderate", { storyId, before: story.status, after: status, reason: reason.trim() });
     }
-    await tx.update(s.contests).set({ publicUpdatedAt: new Date() }).where(eq(s.contests.id, contest.id));
+    await tx.update(s.contests).set({ publicUpdatedAt: currentTime() }).where(eq(s.contests.id, contest.id));
     return { message: "Решение сохранено с причиной и историей." };
   });
 }
@@ -182,10 +181,11 @@ export async function managementView(token: string, slug: string) {
     const [formation] = await tx.select({ at: s.firstRoundFormations.formedAt }).from(s.firstRoundFormations).where(eq(s.firstRoundFormations.contestId, contest.id));
     const members = await tx.select({ id: s.participations.id, mustOne: s.participations.mustVoteRoundOne, mustTwo: s.participations.mustVoteRoundTwo, exemptOne: s.participations.roundOneExemptAt, exemptTwo: s.participations.roundTwoExemptAt }).from(s.participations).where(eq(s.participations.contestId, contest.id));
     const events = await tx.select({ action: s.contestAdminEvents.action, details: s.contestAdminEvents.details, at: s.contestAdminEvents.createdAt, actorName: s.users.publicName }).from(s.contestAdminEvents).leftJoin(s.users, eq(s.contestAdminEvents.actorId, s.users.id)).where(eq(s.contestAdminEvents.contestId, contest.id)).orderBy(desc(s.contestAdminEvents.createdAt)).limit(100);
+    const schedule = await scheduleStatus(tx, contest);
     const { organizerId: _owner, coordinatorId: _coord, ...safe } = contest;
     void _owner; void _coord;
-    return { contest: safe, owner: own, ownerEmail: owner?.email ?? "", coordinatorEmail: coord?.email ?? "", works, themeEntered: Boolean(theme), formedAt: formation?.at?.toISOString() ?? null, participantCount: members.length,
-      events: events.map((e) => ({ action: e.action, at: e.at.toISOString(), actor: e.action === "theme-entered-by-link" ? "Получатель ссылки" : e.actorName || "Уполномоченный пользователь", ...eventView(e.action, e.details, works) })) };
+    return { schedule, contest: safe, owner: own, ownerEmail: owner?.email ?? "", coordinatorEmail: coord?.email ?? "", works, themeEntered: Boolean(theme), formedAt: formation?.at?.toISOString() ?? null, participantCount: members.length,
+      events: events.map((e) => ({ action: e.action, at: e.at.toISOString(), actor: e.action === "theme-entered-by-link" ? "Получатель ссылки" : e.details.actor === "scheduler" ? "Автоматический обработчик" : e.actorName || "Уполномоченный пользователь", ...eventView(e.action, e.details, works) })) };
   });
   const rounds = [];
   for (const round of [1, 2] as const) {

@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import "server-only";
 import { publicAuthorName } from "./author-publication";
 import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
@@ -8,7 +9,7 @@ import { contests, contestGroups, stories, storyRounds } from "./schema";
 import { parseStoryContent, storyVolume } from "../lib/story-content";
 
 // Одинаковая проверка для списка, метаданных и прямого открытия рассказа.
-async function readableStories(contestSlug: string, storyId?: string, connection?: Pick<Database, "select">, now = new Date()) {
+async function readableStories(contestSlug: string, storyId?: string, connection?: Pick<Database, "select">, now = currentTime()) {
   const db = connection ?? (await getDatabase()).db;
   return db.select({
     authorName: publicAuthorName(), id: stories.id, title: stories.title, content: stories.content, length: stories.length,
@@ -38,7 +39,7 @@ export async function getPublicStory(contestSlug: string, storyId: string) {
 
 export async function getPublicStoryGroupContents(contestSlug: string) {
   const { db } = await getDatabase();
-  return db.transaction(async (tx) => readGroups(tx, contestSlug, new Date()));
+  return db.transaction(async (tx) => readGroups(tx, contestSlug, currentTime()));
 }
 
 async function readGroups(db: Pick<Database, "select">, contestSlug: string, now: Date) {

@@ -1,6 +1,8 @@
-import { contestManager, adminEvent } from "../management/access";
+import { currentTime } from "../server/clock";
+import type { TransitionAuthority } from "../scheduling/authority";
+import { transitionActor, adminEvent } from "../management/access";
 import { and, asc, eq } from "drizzle-orm";
-import type { Database } from "../db/connection";
+import type { TransactionDatabase } from "../db/write-transaction";
 import { writeTransaction } from "../db/write-transaction";
 import { contests, contestGroups, stories, storyRounds, participations, ballots, ballotEntries, firstRoundClosures } from "../db/schema";
 import { firstRoundDeadline } from "../voting/eligibility";
@@ -8,15 +10,15 @@ import { closurePolicy, POINTS, scoreStories, rankAndQualify, type ClosureSnapsh
 
 export class ClosureError extends Error {}
 // Server/CLI only: no HTTP handler or client import. Local command cannot touch real contests.
-export async function closeFirstRound(db: Database, slug: string, managerToken?: string) {
+export async function closeFirstRound(db: TransactionDatabase, slug: string, managerToken?: TransitionAuthority) {
   if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new ClosureError("Локальное закрытие разрешено только в development.");
   return writeTransaction(db, async (tx): Promise<ClosureSnapshot> => {
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
     if (!contest || (managerToken === undefined && !contest.isDemo)) throw new ClosureError("Нужен существующий демонстрационный конкурс.");
-    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
+    const actor = await transitionActor(tx, managerToken, contest);
     const [existing] = await tx.select({ snapshot: firstRoundClosures.snapshot }).from(firstRoundClosures).where(eq(firstRoundClosures.contestId, contest.id));
     if (existing) return existing.snapshot;
-    const now = new Date(); const deadline = firstRoundDeadline(contest);
+    const now = currentTime(); const deadline = firstRoundDeadline(contest);
     if (+now < +deadline) throw new ClosureError("Дедлайн первого тура ещё не наступил.");
     if (contest.stage !== "round-one") throw new ClosureError("Первичное закрытие возможно только на этапе первого тура.");
     const allGroups = await tx.select().from(contestGroups).where(eq(contestGroups.contestId, contest.id)).orderBy(asc(contestGroups.round), asc(contestGroups.number));
@@ -75,7 +77,7 @@ export async function closeFirstRound(db: Database, slug: string, managerToken?:
     else if (groups.length === 1) await tx.update(contests).set({ stage: "completed", votingEndedAt: now }).where(eq(contests.id, contest.id));
     // Multiple groups: frozen finalist list is recorded, final voting is not started automatically.
     await tx.insert(firstRoundClosures).values({ contestId: contest.id, closedAt: now, snapshot });
-    if (actor) await adminEvent(tx, contest.id, actor.id, "closeFirstRound");
+    if (actor) await adminEvent(tx, contest.id, actor.id, "closeFirstRound", { actor: actor.scheduled ? "scheduler" : "account" });
     return snapshot;
   });
 }

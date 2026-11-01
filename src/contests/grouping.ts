@@ -1,9 +1,11 @@
-import { contestManager, adminEvent } from "../management/access";
+import { currentTime } from "../server/clock";
+import type { TransitionAuthority } from "../scheduling/authority";
+import { transitionActor, adminEvent } from "../management/access";
 import { writeTransaction } from "../db/write-transaction";
 import { refreshRoundOneExemptions } from "../voting/eligibility";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
-import type { Database } from "../db/connection";
+import type { TransactionDatabase } from "../db/write-transaction";
 import { ballots, contestGroups, contests, contestThemes, firstRoundFormations, participations, stories, storyRounds } from "../db/schema";
 import { balancedBlockPlan, isFailureSnapshot, selectVotingStory, type FailureCode, type FailureSnapshot, type FormationSnapshot } from "./grouping-rules";
 
@@ -19,24 +21,24 @@ export type GroupingDiagnostics = {
 
 export type GroupingResult = { status: "formed"; snapshot: FormationSnapshot } | { status: "failed"; snapshot: FailureSnapshot } | { status: "blocked"; questions: string[]; diagnostics: GroupingDiagnostics };
 
-export async function closeReception(db: Database, slug: string, managerToken?: string) {
+export async function closeReception(db: TransactionDatabase, slug: string, managerToken?: TransitionAuthority) {
   if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new GroupingError("Закрытие через эту операцию разрешено только в development.");
   return writeTransaction(db, async (tx) => {
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
     if (!contest || (managerToken === undefined && !contest.isDemo)) throw new GroupingError("Нужен существующий демонстрационный конкурс.");
-    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
-    if (+contest.submissionsEndAt > Date.now()) throw new GroupingError("Приём работ ещё не завершён.");
+    const actor = await transitionActor(tx, managerToken, contest);
+    if (+contest.submissionsEndAt > +currentTime()) throw new GroupingError("Приём работ ещё не завершён.");
     if (contest.stage === "preparation") throw new GroupingError("Конкурс ещё не активирован.");
     if (contest.stage !== "submissions") return { stage: contest.stage };
     await tx.update(contests).set({ stage: "moderation" }).where(eq(contests.id, contest.id));
-    if (actor) await adminEvent(tx, contest.id, actor.id, "closeReception");
+    if (actor) await adminEvent(tx, contest.id, actor.id, "closeReception", { actor: actor.scheduled ? "scheduler" : "account" });
     return { stage: "moderation" as const };
   });
 }
 
 // Низкоуровневый модуль используется только сервером/CLI и тестами.
 // Здесь нет импорта next/headers и нет публичного обработчика запуска.
-export async function formFirstRound(db: Database, slug: string, managerToken?: string): Promise<GroupingResult> {
+export async function formFirstRound(db: TransactionDatabase, slug: string, managerToken?: TransitionAuthority): Promise<GroupingResult> {
   if (managerToken === undefined && process.env.NODE_ENV !== "development") throw new GroupingError("Формирование через эту операцию разрешено только в development.");
   // Драйвер libSQL начинает write-транзакцию до выполнения callback:
   // второй процесс ждёт первого и читает уже зафиксированный снимок.
@@ -44,10 +46,10 @@ export async function formFirstRound(db: Database, slug: string, managerToken?: 
     const [contest] = await tx.select().from(contests).where(eq(contests.slug, slug));
     if (!contest) throw new GroupingError("Конкурс не найден.");
     if (managerToken === undefined && !contest.isDemo) throw new GroupingError("Локальная операция разрешена только для демонстрационного конкурса.");
-    const actor = managerToken === undefined ? null : await contestManager(tx, managerToken, contest);
+    const actor = await transitionActor(tx, managerToken, contest);
     const [existing] = await tx.select({ snapshot: firstRoundFormations.snapshot }).from(firstRoundFormations).where(eq(firstRoundFormations.contestId, contest.id));
     if (existing) return isFailureSnapshot(existing.snapshot) ? { status: "failed", snapshot: existing.snapshot } : { status: "formed", snapshot: existing.snapshot };
-    const now = new Date();
+    const now = currentTime();
     if (+contest.submissionsEndAt > +now) throw new GroupingError("Приём работ ещё не завершён.");
     if (!["submissions", "moderation"].includes(contest.stage)) throw new GroupingError("Первичное распределение запрещено после начала голосования или завершения конкурса.");
     const oldGroups = await tx.select({ id: contestGroups.id }).from(contestGroups).where(eq(contestGroups.contestId, contest.id));
@@ -74,7 +76,7 @@ export async function formFirstRound(db: Database, slug: string, managerToken?: 
       const snapshot: FailureSnapshot = { kind: "failed", version: "admitted-viability-v1", checkedAt: now.toISOString(), admittedCount: admitted.length, admittedAuthorCount: authors.size, reasons: failureChecks };
       await tx.update(contests).set({ stage: "failed", failureReason: JSON.stringify(failureChecks) }).where(eq(contests.id, contest.id));
       await tx.insert(firstRoundFormations).values({ contestId: contest.id, formedAt: now, snapshot });
-      if (actor) await adminEvent(tx, contest.id, actor.id, "formFirstRound", { outcome: "failed" });
+      if (actor) await adminEvent(tx, contest.id, actor.id, "formFirstRound", { actor: actor.scheduled ? "scheduler" : "account", outcome: "failed" });
       return { status: "failed", snapshot };
     }
     if (theme === "empty-open") questions.push("В ТЗ не определено, считается ли пустое/пробельное значение темой.");
@@ -104,9 +106,9 @@ export async function formFirstRound(db: Database, slug: string, managerToken?: 
     for (const assignment of snapshot.assignments) await tx.update(participations).set({ assignedGroupId: assignment.groupId, assignedRound: 1, mustVoteRoundOne: true })
       .where(and(eq(participations.id, assignment.participationId), eq(participations.contestId, contest.id), isNull(participations.assignedGroupId)));
     await tx.insert(firstRoundFormations).values({ contestId: contest.id, formedAt: now, snapshot });
-    await refreshRoundOneExemptions(tx, contest.id, now);
+    await refreshRoundOneExemptions(tx, contest.id, now, true);
     // Формирование публикует допущенные работы, но не запускает голосование.
-    if (actor) await adminEvent(tx, contest.id, actor.id, "formFirstRound", { outcome: "formed" });
+    if (actor) await adminEvent(tx, contest.id, actor.id, "formFirstRound", { actor: actor.scheduled ? "scheduler" : "account", outcome: "formed" });
     return { status: "formed", snapshot };
   });
 }

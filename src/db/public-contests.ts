@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import "server-only";
 import { and, asc, eq, lte, ne } from "drizzle-orm";
 import type { Contest } from "../lib/contests";
@@ -9,7 +10,7 @@ import { publicFailureMessage } from "../contests/grouping-rules";
 // Скрытая тема и её условия отсекаются в SQL до формирования результата.
 export async function getPublicContests(slug?: string): Promise<Contest[]> {
   const { db } = await getDatabase();
-  const now = new Date();
+  const now = currentTime();
   const rows = await db.select({
     slug: contests.slug, title: contests.title, description: contests.description,
     stage: contests.stage, minLength: contests.minLength, maxLength: contests.maxLength,

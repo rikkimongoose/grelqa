@@ -1,3 +1,4 @@
+import { currentTime } from "../server/clock";
 import "server-only";
 import { contestManager, ManagementError } from "../management/access";
 import { randomUUID, createHash } from "node:crypto";
@@ -16,7 +17,7 @@ async function votingTransaction<T>(work: (tx: Tx) => Promise<T>): Promise<T> {
 
 async function verified(db: VotingDb, token?: string) {
   const [user] = await db.select({ id: users.id }).from(authSessions).innerJoin(users, eq(authSessions.userId, users.id))
-    .where(and(eq(authSessions.tokenHash, tokenHash("session", token || "")), gt(authSessions.expiresAt, new Date()), isNotNull(users.emailVerifiedAt)));
+    .where(and(eq(authSessions.tokenHash, tokenHash("session", token || "")), gt(authSessions.expiresAt, currentTime()), isNotNull(users.emailVerifiedAt)));
   if (!user) throw new AuthError("Требуется вход с подтверждённым email.", 403);
   return user;
 }
@@ -33,7 +34,7 @@ async function context(tx: Tx, token: string | undefined, slug: string, round: 1
   if (round === 2 && (!member || !closure || closure.snapshot.outcome !== "results" || closure.snapshot.settings.singleRound || !final || !final.snapshot.members.some((owner) => owner.participationId === member.id && owner.userId === user.id) || (contest.stage === "failed" && !completed))) throw new AuthError("Финальное голосование доступно только авторам работ из зафиксированного состава финала после подготовки тура.", 403);
   if (!member) throw new AuthError("Нет участия в конкурсе.", 403);
   const groupId = round === 1 ? member.assignedGroupId! : final!.snapshot.groupId;
-  const available = await eligibleStories(tx, contest, groupId, user.id, new Date(), round);
+  const available = await eligibleStories(tx, contest, groupId, user.id, currentTime(), round);
   const rightsEnded = round === 2 && member.roundTwoRightsEndedAt !== null;
   const blockedMessage = rightsEnded ? "Все ваши финальные работы сняты. Право и обязанность финального голоса прекращены; сохранённые версии доступны для просмотра." : null;
   const [draft] = await tx.select().from(ballotDrafts).where(and(eq(ballotDrafts.participationId, member.id), eq(ballotDrafts.round, round)));
@@ -60,7 +61,7 @@ export async function myBallot(token: string | undefined, slug: string, round: 1
     }
     const selected = draft?.selections ?? entries.map((entry) => entry.id);
     return { slug, round, title: contest.title, groupId: state.groupId, deadline: (round === 1 ? firstRoundDeadline(contest) : contest.endsAt).toISOString(),
-      open: !state.closed && !state.blockedMessage && (round !== 2 || Date.now() >= +new Date(state.preparedAt!)) && (round === 1 ? firstRoundOpen(contest, new Date()) : finalRoundOpen(contest, new Date())), blockedMessage: state.blockedMessage, rightsEnded: state.rightsEnded, exempt: (round === 1 ? member.roundOneExemptAt : member.roundTwoExemptAt) !== null,
+      open: !state.closed && !state.blockedMessage && (round !== 2 || +currentTime() >= +new Date(state.preparedAt!)) && (round === 1 ? firstRoundOpen(contest, currentTime()) : finalRoundOpen(contest, currentTime())), blockedMessage: state.blockedMessage, rightsEnded: state.rightsEnded, exempt: (round === 1 ? member.roundOneExemptAt : member.roundTwoExemptAt) !== null,
       required, available, revision: draft?.revision ?? 0,
       hasDraft: draft?.selections !== null && draft?.selections !== undefined,
       selected: selected.map((id, index) => ({ id, title: visible.get(id)!, position: index + 1, unavailable: !ids.has(id) })),
@@ -100,7 +101,7 @@ export async function changeBallot(token: string | undefined, action: "draft" | 
     if (selections.length > 6 || new Set(selections).size !== selections.length) throw new AuthError("Не больше шести разных работ; повторы запрещены.");
     if (selections.some((id) => !activeIds.has(id))) throw new AuthError("Есть свои, снятые или недоступные работы. Исправьте выбор перед сохранением/отправкой.");
     if (action === "submit" && selections.length !== Math.min(6, available.length)) throw new AuthError(`Нужно выбрать ${Math.min(6, available.length)} работ и расставить их с первого места.`);
-    const now = new Date();
+    const now = currentTime();
     if (action === "submit") {
       const ballotId = sent?.id ?? randomUUID();
       if (sent) {
