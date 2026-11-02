@@ -31,9 +31,9 @@ test("миграция принятого правила: старый фина�
     await delay(5); const removedAt = new Date();
     await fixture.db.update(s.storyRounds).set({ status: "withdrawn", withdrawnAt: removedAt, withdrawalReason: "Снята автором" }).where(and(eq(s.storyRounds.storyId, `${root}-story-1`), eq(s.storyRounds.round, 2)));
     const oldFolder = path.join(directory, "old"); await mkdir(path.join(oldFolder, "meta"), { recursive: true });
-    const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx < 7);
+    const journal = JSON.parse(await readFile("tests/fixtures/legacy-drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx < 7);
     await writeFile(path.join(oldFolder, "meta/_journal.json"), JSON.stringify(journal));
-    for (const entry of journal.entries) await copyFile(`drizzle/${entry.tag}.sql`, path.join(oldFolder, `${entry.tag}.sql`));
+    for (const entry of journal.entries) await copyFile(`tests/fixtures/legacy-drizzle/${entry.tag}.sql`, path.join(oldFolder, `${entry.tag}.sql`));
     await migrate(legacy.db, { migrationsFolder: oldFolder });
     const tables = ["users", "contests", "contest_themes", "contest_groups", "participations", "stories", "story_rounds", "ballots", "ballot_entries", "ballot_drafts", "ballot_requests", "first_round_formations", "first_round_closures", "final_rounds"];
     const oldColumns = new Map<string, string[]>();
@@ -44,7 +44,7 @@ test("миграция принятого правила: старый фина�
     }
     const preservedTables = tables.filter((table) => table !== "participations");
     const before = await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT ${oldColumns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
-    await migrate(legacy.db, { migrationsFolder: "drizzle" }); await migrate(legacy.db, { migrationsFolder: "drizzle" });
+    await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" }); await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" });
     assert.deepEqual(await Promise.all(preservedTables.map(async (table) => (await legacy.client.execute(`SELECT ${oldColumns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows)), before);
     assert.ok((await legacy.db.select({ name: s.users.publicName }).from(s.users)).every((row) => row.name === null));
     assert.deepEqual(await legacy.db.select().from(s.contestFinalizations), []);

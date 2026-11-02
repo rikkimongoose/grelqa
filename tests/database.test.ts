@@ -16,10 +16,10 @@ test("миграции сохраняют существующие конкур�
   try {
     const initial = path.join(directory, "initial");
     await mkdir(path.join(initial, "meta"), { recursive: true });
-    const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8"));
+    const journal = JSON.parse(await readFile("tests/fixtures/legacy-drizzle/meta/_journal.json", "utf8"));
     journal.entries = journal.entries.slice(0, 1);
     await writeFile(path.join(initial, "meta/_journal.json"), JSON.stringify(journal));
-    await copyFile(`drizzle/${journal.entries[0].tag}.sql`, path.join(initial, `${journal.entries[0].tag}.sql`));
+    await copyFile(`tests/fixtures/legacy-drizzle/${journal.entries[0].tag}.sql`, path.join(initial, `${journal.entries[0].tag}.sql`));
     await migrate(db, { migrationsFolder: initial });
     // Получаем реальные seed-данные на актуальной схеме, а в старую копируем
     // только существовавшие тогда столбцы. Так тест не зависит от новых defaults ORM.
@@ -39,8 +39,8 @@ test("миграции сохраняют существующие конкур�
       }
     } finally { fixture.client.close(); }
     const before = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT ${columns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
-    await migrate(db, { migrationsFolder: "drizzle" });
-    await migrate(db, { migrationsFolder: "drizzle" });
+    await migrate(db, { migrationsFolder: "tests/fixtures/legacy-drizzle" });
+    await migrate(db, { migrationsFolder: "tests/fixtures/legacy-drizzle" });
     const after = await Promise.all(tables.map(async (table) => (await client.execute(`SELECT ${columns.get(table)!.join(",")} FROM ${table} ORDER BY rowid`)).rows));
     assert.deepEqual(after, before);
     assert.deepEqual((await client.execute("PRAGMA foreign_key_check")).rows, []);

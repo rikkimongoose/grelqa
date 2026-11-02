@@ -1,0 +1,90 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1793393221330,
+      "tag": "0000_previous_tusk",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793396380762,
+      "tag": "0001_flippant_nemesis",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793398950529,
+      "tag": "0002_fantastic_zombie",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1793428980180,
+      "tag": "0003_lowly_lethal_legion",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1793522338984,
+      "tag": "0004_majestic_war_machine",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793524959137,
+      "tag": "0005_dashing_frightful_four",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793530375773,
+      "tag": "0006_big_captain_universe",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1793532303462,
+      "tag": "0007_regular_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793533410556,
+      "tag": "0008_outgoing_the_phantom",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793554324706,
+      "tag": "0009_gigantic_slayback",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793556081842,
+      "tag": "0010_sad_king_cobra",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793565787080,
+      "tag": "0011_married_wong",
+      "breakpoints": true
+    }
+  ]
+}

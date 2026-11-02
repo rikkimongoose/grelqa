@@ -53,14 +53,14 @@ test("метаданные: миграция, права, журнал, публ
     const legacy = await openDatabase(`file:${path.join(directory, "old.db")}`);
     try {
       const folder = path.join(directory, "old"); await mkdir(path.join(folder, "meta"), { recursive: true });
-      const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((e: { idx: number }) => e.idx < 11);
-      await writeFile(path.join(folder, "meta/_journal.json"), JSON.stringify(journal)); for (const e of journal.entries) await copyFile(`drizzle/${e.tag}.sql`, path.join(folder, `${e.tag}.sql`));
+      const journal = JSON.parse(await readFile("tests/fixtures/legacy-drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((e: { idx: number }) => e.idx < 11);
+      await writeFile(path.join(folder, "meta/_journal.json"), JSON.stringify(journal)); for (const e of journal.entries) await copyFile(`tests/fixtures/legacy-drizzle/${e.tag}.sql`, path.join(folder, `${e.tag}.sql`));
       await migrate(legacy.db, { migrationsFolder: folder });
       const tables = ["users", "contests", "contest_themes", "contest_groups", "participations", "stories", "story_rounds", "ballots", "ballot_entries", "ballot_drafts", "ballot_requests", "first_round_formations", "first_round_closures", "final_rounds"];
       const columns = new Map<string, string[]>();
       for (const t of tables) { const names = (await legacy.client.execute(`pragma table_info(${t})`)).rows.map((r) => String(r.name)); columns.set(t, names); for (const r of (await client.execute(`select ${names.join(",")} from ${t} order by rowid`)).rows) await legacy.client.execute({ sql: `insert into ${t} (${names.join(",")}) values (${names.map(() => "?").join(",")})`, args: names.map((_, i) => r[i]) }); }
       const query = async (t: string) => (await legacy.client.execute(`select ${columns.get(t)!.join(",")} from ${t} order by rowid`)).rows;
-      const before = await Promise.all(tables.map(query)); await migrate(legacy.db, { migrationsFolder: "drizzle" }); await migrate(legacy.db, { migrationsFolder: "drizzle" }); assert.deepEqual(await Promise.all(tables.map(query)), before);
+      const before = await Promise.all(tables.map(query)); await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" }); await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" }); assert.deepEqual(await Promise.all(tables.map(query)), before);
       assert.deepEqual((await legacy.client.execute("pragma foreign_key_check")).rows, []);
     } finally { legacy.client.close(); }
     const draftSettings = { title: "Подготовка Criticat", description: "Проверка настроек", discussionUrl: "https://example.test/legacy", ownerEmail: `${root}-1@grelqa.example`, coordinatorEmail: "", submissionsStartAt: "2099-01-01T15:00", submissionsEndAt: "2099-01-02T15:00", roundOneStartAt: "2099-01-03T15:00", roundTwoStartAt: "2099-01-04T15:00", endsAt: "2099-01-05T15:00", groupCapacity: 20, finalCapacity: 20, minLength: 0, maxLength: 0 };

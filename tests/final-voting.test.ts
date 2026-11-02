@@ -41,9 +41,9 @@ test("финальное голосование: допуск из снимка,
     const legacy = await openDatabase(`file:${path.join(directory, "legacy.db")}`);
     try {
       const oldFolder = path.join(directory, "old-migrations"); await mkdir(path.join(oldFolder, "meta"), { recursive: true });
-      const journal = JSON.parse(await readFile("drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx < 6);
+      const journal = JSON.parse(await readFile("tests/fixtures/legacy-drizzle/meta/_journal.json", "utf8")); journal.entries = journal.entries.filter((entry: { idx: number }) => entry.idx < 6);
       await writeFile(path.join(oldFolder, "meta/_journal.json"), JSON.stringify(journal));
-      for (const entry of journal.entries) await copyFile(`drizzle/${entry.tag}.sql`, path.join(oldFolder, `${entry.tag}.sql`));
+      for (const entry of journal.entries) await copyFile(`tests/fixtures/legacy-drizzle/${entry.tag}.sql`, path.join(oldFolder, `${entry.tag}.sql`));
       await migrate(legacy.db, { migrationsFolder: oldFolder });
       for (const table of ["users", "contests", "contest_themes", "contest_groups", "participations", "stories", "story_rounds", "ballots", "ballot_entries", "ballot_drafts", "first_round_formations", "first_round_closures"]) {
         const names = (await legacy.client.execute(`PRAGMA table_info(${table})`)).rows.map((row) => String(row.name));
@@ -52,7 +52,7 @@ test("финальное голосование: допуск из снимка,
       await legacy.client.execute({ sql: "INSERT INTO ballot_requests(participation_id,request_id,payload_hash,response,received_at) VALUES(?,?,?,?,?)", args: [pid(1), "old-receipt", "old-hash", '{"revision":7,"message":"old","submittedAt":null}', Date.now()] });
       const oldDrafts = (await legacy.client.execute("SELECT * FROM ballot_drafts ORDER BY participation_id")).rows;
       const oldReceipts = (await legacy.client.execute("SELECT participation_id,request_id,payload_hash,response,received_at FROM ballot_requests")).rows;
-      await migrate(legacy.db, { migrationsFolder: "drizzle" }); await migrate(legacy.db, { migrationsFolder: "drizzle" });
+      await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" }); await migrate(legacy.db, { migrationsFolder: "tests/fixtures/legacy-drizzle" });
       assert.deepEqual((await legacy.client.execute("SELECT * FROM ballot_drafts ORDER BY participation_id")).rows, oldDrafts);
       assert.deepEqual((await legacy.client.execute("SELECT participation_id,request_id,payload_hash,response,received_at FROM ballot_requests")).rows, oldReceipts);
       assert.equal((await legacy.client.execute("SELECT round FROM ballot_requests")).rows[0].round, 1);

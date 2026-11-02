@@ -1,9 +1,291 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "c1295713-9950-46f4-babc-51378f2d487e",
+  "id": "37788f5b-f2fe-4d87-84c5-5f51b24b4ab4",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
+    "auth_rate_limits": {
+      "name": "auth_rate_limits",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "resets_at": {
+          "name": "resets_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "auth_sessions": {
+      "name": "auth_sessions",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_session_user": {
+          "name": "auth_session_user",
+          "columns": [
+            "user_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auth_sessions_user_id_users_id_fk": {
+          "name": "auth_sessions_user_id_users_id_fk",
+          "tableFrom": "auth_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "auth_tokens": {
+      "name": "auth_tokens",
+      "columns": {
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "purpose": {
+          "name": "purpose",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "auth_token_user": {
+          "name": "auth_token_user",
+          "columns": [
+            "user_id",
+            "purpose"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "auth_tokens_user_id_users_id_fk": {
+          "name": "auth_tokens_user_id_users_id_fk",
+          "tableFrom": "auth_tokens",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "auth_token_purpose": {
+          "name": "auth_token_purpose",
+          "value": "\"auth_tokens\".\"purpose\" in ('verify','reset')"
+        }
+      }
+    },
+    "ballot_drafts": {
+      "name": "ballot_drafts",
+      "columns": {
+        "participation_id": {
+          "name": "participation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "round": {
+          "name": "round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "selections": {
+          "name": "selections",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ballot_drafts_participation_id_contest_id_participations_id_contest_id_fk": {
+          "name": "ballot_drafts_participation_id_contest_id_participations_id_contest_id_fk",
+          "tableFrom": "ballot_drafts",
+          "tableTo": "participations",
+          "columnsFrom": [
+            "participation_id",
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id",
+            "contest_id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "ballot_drafts_group_id_contest_id_round_contest_groups_id_contest_id_round_fk": {
+          "name": "ballot_drafts_group_id_contest_id_round_contest_groups_id_contest_id_round_fk",
+          "tableFrom": "ballot_drafts",
+          "tableTo": "contest_groups",
+          "columnsFrom": [
+            "group_id",
+            "contest_id",
+            "round"
+          ],
+          "columnsTo": [
+            "id",
+            "contest_id",
+            "round"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ballot_drafts_participation_id_round_pk": {
+          "columns": [
+            "participation_id",
+            "round"
+          ],
+          "name": "ballot_drafts_participation_id_round_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "draft_round": {
+          "name": "draft_round",
+          "value": "\"ballot_drafts\".\"round\" in (1, 2)"
+        },
+        "draft_revision": {
+          "name": "draft_revision",
+          "value": "\"ballot_drafts\".\"revision\" >= 0"
+        }
+      }
+    },
     "ballot_entries": {
       "name": "ballot_entries",
       "columns": {
@@ -114,6 +396,87 @@
         "ballot_position_range": {
           "name": "ballot_position_range",
           "value": "\"ballot_entries\".\"position\" between 1 and 6"
+        }
+      }
+    },
+    "ballot_requests": {
+      "name": "ballot_requests",
+      "columns": {
+        "participation_id": {
+          "name": "participation_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "round": {
+          "name": "round",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "payload_hash": {
+          "name": "payload_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "response": {
+          "name": "response",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "received_at": {
+          "name": "received_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ballot_requests_participation_id_participations_id_fk": {
+          "name": "ballot_requests_participation_id_participations_id_fk",
+          "tableFrom": "ballot_requests",
+          "tableTo": "participations",
+          "columnsFrom": [
+            "participation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "ballot_requests_participation_id_round_request_id_pk": {
+          "columns": [
+            "participation_id",
+            "round",
+            "request_id"
+          ],
+          "name": "ballot_requests_participation_id_round_request_id_pk"
+        }
+      },
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "request_round": {
+          "name": "request_round",
+          "value": "\"ballot_requests\".\"round\" in (1, 2)"
         }
       }
     },
@@ -240,9 +603,149 @@
         }
       }
     },
+    "contest_admin_events": {
+      "name": "contest_admin_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "details": {
+          "name": "details",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "admin_events_contest": {
+          "name": "admin_events_contest",
+          "columns": [
+            "contest_id",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "contest_admin_events_contest_id_contests_id_fk": {
+          "name": "contest_admin_events_contest_id_contests_id_fk",
+          "tableFrom": "contest_admin_events",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "contest_admin_events_actor_id_users_id_fk": {
+          "name": "contest_admin_events_actor_id_users_id_fk",
+          "tableFrom": "contest_admin_events",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "contest_finalizations": {
+      "name": "contest_finalizations",
+      "columns": {
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "contest_finalizations_contest_id_contests_id_fk": {
+          "name": "contest_finalizations_contest_id_contests_id_fk",
+          "tableFrom": "contest_finalizations",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "contest_groups": {
       "name": "contest_groups",
       "columns": {
+        "criticat_discussion_url": {
+          "name": "criticat_discussion_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "id": {
           "name": "id",
           "type": "text",
@@ -334,6 +837,66 @@
         }
       }
     },
+    "contest_theme_invites": {
+      "name": "contest_theme_invites",
+      "columns": {
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "used_at": {
+          "name": "used_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "contest_theme_invites_token_hash_unique": {
+          "name": "contest_theme_invites_token_hash_unique",
+          "columns": [
+            "token_hash"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "contest_theme_invites_contest_id_contests_id_fk": {
+          "name": "contest_theme_invites_contest_id_contests_id_fk",
+          "tableFrom": "contest_theme_invites",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "contest_themes": {
       "name": "contest_themes",
       "columns": {
@@ -415,6 +978,124 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "contest_transition_runs": {
+      "name": "contest_transition_runs",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "action": {
+          "name": "action",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "source": {
+          "name": "source",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "started_at": {
+          "name": "started_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "finished_at": {
+          "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "outcome": {
+          "name": "outcome",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "message": {
+          "name": "message",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "transition_runs_contest": {
+          "name": "transition_runs_contest",
+          "columns": [
+            "contest_id",
+            "finished_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "contest_transition_runs_contest_id_contests_id_fk": {
+          "name": "contest_transition_runs_contest_id_contests_id_fk",
+          "tableFrom": "contest_transition_runs",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "contest_transition_runs_actor_id_users_id_fk": {
+          "name": "contest_transition_runs_actor_id_users_id_fk",
+          "tableFrom": "contest_transition_runs",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "transition_source": {
+          "name": "transition_source",
+          "value": "\"contest_transition_runs\".\"source\" in ('scheduled','manual')"
+        },
+        "transition_outcome": {
+          "name": "transition_outcome",
+          "value": "\"contest_transition_runs\".\"outcome\" in ('success','blocked','error')"
+        }
+      }
+    },
     "contests": {
       "name": "contests",
       "columns": {
@@ -439,6 +1120,36 @@
           "notNull": true,
           "autoincrement": false
         },
+        "coordinator_id": {
+          "name": "coordinator_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "is_draft": {
+          "name": "is_draft",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
+        },
+        "public_updated_at": {
+          "name": "public_updated_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "settings_revision": {
+          "name": "settings_revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
+        },
         "title": {
           "name": "title",
           "type": "text",
@@ -455,6 +1166,13 @@
         },
         "discussion_url": {
           "name": "discussion_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "criticat_discussion_url": {
+          "name": "criticat_discussion_url",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -606,6 +1324,19 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "contests_coordinator_id_users_id_fk": {
+          "name": "contests_coordinator_id_users_id_fk",
+          "tableFrom": "contests",
+          "tableTo": "users",
+          "columnsFrom": [
+            "coordinator_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -636,6 +1367,169 @@
           "value": "(\"contests\".\"preparation_at\" is null or \"contests\".\"preparation_at\" <= \"contests\".\"submissions_start_at\") and \"contests\".\"submissions_start_at\" < \"contests\".\"submissions_end_at\" and \"contests\".\"submissions_end_at\" <= \"contests\".\"round_one_start_at\" and \"contests\".\"round_one_start_at\" < \"contests\".\"ends_at\" and (\"contests\".\"round_two_start_at\" is null or (\"contests\".\"round_one_start_at\" < \"contests\".\"round_two_start_at\" and \"contests\".\"round_two_start_at\" < \"contests\".\"ends_at\"))"
         }
       }
+    },
+    "final_rounds": {
+      "name": "final_rounds",
+      "columns": {
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "group_id": {
+          "name": "group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "prepared_at": {
+          "name": "prepared_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "final_rounds_group_id_unique": {
+          "name": "final_rounds_group_id_unique",
+          "columns": [
+            "group_id"
+          ],
+          "isUnique": true
+        }
+      },
+      "foreignKeys": {
+        "final_rounds_contest_id_contests_id_fk": {
+          "name": "final_rounds_contest_id_contests_id_fk",
+          "tableFrom": "final_rounds",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "final_rounds_group_id_contest_groups_id_fk": {
+          "name": "final_rounds_group_id_contest_groups_id_fk",
+          "tableFrom": "final_rounds",
+          "tableTo": "contest_groups",
+          "columnsFrom": [
+            "group_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "first_round_closures": {
+      "name": "first_round_closures",
+      "columns": {
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "closed_at": {
+          "name": "closed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "first_round_closures_contest_id_contests_id_fk": {
+          "name": "first_round_closures_contest_id_contests_id_fk",
+          "tableFrom": "first_round_closures",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "first_round_formations": {
+      "name": "first_round_formations",
+      "columns": {
+        "contest_id": {
+          "name": "contest_id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "formed_at": {
+          "name": "formed_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "snapshot": {
+          "name": "snapshot",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "first_round_formations_contest_id_contests_id_fk": {
+          "name": "first_round_formations_contest_id_contests_id_fk",
+          "tableFrom": "first_round_formations",
+          "tableTo": "contests",
+          "columnsFrom": [
+            "contest_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
     },
     "participations": {
       "name": "participations",
@@ -699,6 +1593,41 @@
           "notNull": true,
           "autoincrement": false,
           "default": false
+        },
+        "round_two_rights_ended_at": {
+          "name": "round_two_rights_ended_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "round_two_exempt_at": {
+          "name": "round_two_exempt_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "round_two_exempt_reason": {
+          "name": "round_two_exempt_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "round_one_exempt_at": {
+          "name": "round_one_exempt_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "round_one_exempt_reason": {
+          "name": "round_one_exempt_reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "created_at": {
           "name": "created_at",
@@ -783,6 +1712,13 @@
     "stories": {
       "name": "stories",
       "columns": {
+        "ai_generation_basis_points": {
+          "name": "ai_generation_basis_points",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "id": {
           "name": "id",
           "type": "text",
@@ -853,6 +1789,14 @@
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 1
         },
         "published_at": {
           "name": "published_at",
@@ -927,6 +1871,10 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {
+        "story_ai_percentage": {
+          "name": "story_ai_percentage",
+          "value": "\"stories\".\"ai_generation_basis_points\" is null or (typeof(\"stories\".\"ai_generation_basis_points\") = 'integer' and \"stories\".\"ai_generation_basis_points\" between 0 and 10000)"
+        },
         "story_status": {
           "name": "story_status",
           "value": "\"stories\".\"status\" in ('draft','submitted','admitted','rejected','withdrawn')"
@@ -1094,6 +2042,13 @@
           "notNull": true,
           "autoincrement": false
         },
+        "public_name": {
+          "name": "public_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "email": {
           "name": "email",
           "type": "text",
@@ -1130,6 +2085,13 @@
             "email"
           ],
           "isUnique": true
+        },
+        "users_normalized_email": {
+          "name": "users_normalized_email",
+          "columns": [
+            "lower(trim(\"email\"))"
+          ],
+          "isUnique": true
         }
       },
       "foreignKeys": {},
@@ -1146,6 +2108,14 @@
     "columns": {}
   },
   "internal": {
-    "indexes": {}
+    "indexes": {
+      "users_normalized_email": {
+        "columns": {
+          "lower(trim(\"email\"))": {
+            "isExpression": true
+          }
+        }
+      }
+    }
   }
 }
