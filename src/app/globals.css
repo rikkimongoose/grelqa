@@ -202,3 +202,12 @@ h3 { font-size: 28px; margin-bottom: 16px; }
 .confirmation input { width: auto; flex: 0 0 auto; }
 .admin-details { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; }
 .moderation-story summary { cursor: pointer; }
+
+.ai-generation { display: block; margin-top: .35rem; font-size: .85rem; font-weight: 400; color: var(--muted); overflow-wrap: anywhere; }
+.ai-explanation { display: block; font-size: .75rem; line-height: 1.5; max-width: 46rem; }
+.criticat-link { display: inline-flex; margin: .5rem 0 1rem; }
+.story-list > li > div { min-width: 0; overflow-wrap: anywhere; }
+.story-list h3, .story-list h4, .ballot-choices > li > div { overflow-wrap: anywhere; }
+
+.reading-header h1, .moderation-story summary { overflow-wrap: anywhere; }
+.management { min-width: 0; overflow-wrap: anywhere; }

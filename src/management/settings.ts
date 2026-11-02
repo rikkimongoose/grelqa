@@ -1,3 +1,4 @@
+import { criticatUrl } from "../lib/story-annotations";
 import { z } from "zod";
 const date = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).transform((value, ctx) => {
   const parsed = new Date(value + ":00+03:00");
@@ -8,6 +9,7 @@ const date = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).transform((valu
 });
 export const contestSettings = z.object({
   title: z.string().trim().min(1).max(200), description: z.string().trim().min(1).max(10000),
+  criticatDiscussionUrl: criticatUrl.optional(),
   discussionUrl: z.union([z.literal(""), z.url().refine((s) => ["http:", "https:"].includes(new URL(s).protocol))]),
   ownerEmail: z.string().trim().toLowerCase().email(), coordinatorEmail: z.union([z.literal(""), z.string().trim().toLowerCase().email()]),
   submissionsStartAt: date, submissionsEndAt: date, roundOneStartAt: date, roundTwoStartAt: z.union([z.literal(""), date]), endsAt: date,

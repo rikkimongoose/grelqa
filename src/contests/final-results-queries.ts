@@ -1,15 +1,16 @@
 import "server-only";
+import { storyAiValues } from "../db/story-annotations";
 import { eq } from "drizzle-orm";
 import { getDatabase } from "../db";
 import { contests, contestFinalizations, participations } from "../db/schema";
 import type { FinalizationSnapshot } from "./finalization-types";
 import { publicFailureMessage } from "./grouping-rules";
 
-function publicResult(snapshot: FinalizationSnapshot) {
+function publicResult(snapshot: FinalizationSnapshot, aiValues = new Map<string, number | null>()) {
   const failed = snapshot.tally.outcome === "failed";
   const names = new Map(snapshot.authors.map((a) => [a.storyId, a.name]));
   return { completedAt: snapshot.completedAt, round: snapshot.round, failed, failureMessage: publicFailureMessage(snapshot.tally.failureReason),
-    stories: snapshot.tally.results.map((r) => ({ id: r.id, title: r.title, points: failed ? null : r.points, place: failed ? null : r.place,
+    stories: snapshot.tally.results.map((r) => ({ aiGenerationBasisPoints: aiValues.get(r.id) ?? null, id: r.id, title: r.title, points: failed ? null : r.points, place: failed ? null : r.place,
       shared: !failed && r.shared, winner: !failed && snapshot.winners.includes(r.id), authorName: failed ? null : names.get(r.id) ?? null,
       readable: !failed && !r.withdrawn, withdrawn: r.withdrawn,
       withdrawalMessage: r.withdrawalCode === "not-voted" ? "Снята: обязательное голосование не выполнено." : r.withdrawn ? "Работа снята с тура." : null,
@@ -17,10 +18,10 @@ function publicResult(snapshot: FinalizationSnapshot) {
 }
 export async function publicFinalResults(slug: string) {
   const { db } = await getDatabase();
-  const [row] = await db.select({ snapshot: contestFinalizations.snapshot, stage: contests.stage }).from(contestFinalizations)
+  const [row] = await db.select({ contestId: contests.id, snapshot: contestFinalizations.snapshot, stage: contests.stage }).from(contestFinalizations)
     .innerJoin(contests, eq(contestFinalizations.contestId, contests.id)).where(eq(contests.slug, slug));
   if (!row || !["completed", "failed"].includes(row.stage)) return undefined;
-  return publicResult(row.snapshot);
+  return publicResult(row.snapshot, await storyAiValues(db, row.contestId));
 }
 export async function ownFinalResults(userId: string) {
   const { db } = await getDatabase();

@@ -1,3 +1,5 @@
+import { AiGeneration } from "@/components/ai-generation";
+import { CriticatLink } from "@/components/criticat-link";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -44,6 +46,7 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
     <header className="contest-hero"><StageBadge stage={contest.stage} /><h1>{contest.title}</h1><p className="hero-copy">{contest.description}</p></header>
     {contest.stage === "failed" && <aside className="empty-stories" role="status"><strong>Конкурс не состоялся.</strong><p>{contest.failureMessage}</p><p>Конкурс и его история сохранены.</p></aside>}
     {submission?.open && <aside className="submission-action">{user?.emailVerifiedAt ? <Link className="button" href={`/contests/${encodeURIComponent(slug)}/submit`}>Подать рассказ →</Link> : user ? <><p>Для подачи рассказа подтвердите email.</p><Link className="button" href="/registration-status">Подтвердить email</Link></> : <><p>Приём открыт. Чтобы подать рассказ, войдите в учётную запись с подтверждённым email.</p><Link className="button" href={`/login?returnTo=${encodeURIComponent(`/contests/${slug}`)}`}>Войти и подать рассказ →</Link></>}</aside>}
+    <CriticatLink url={contest.criticatDiscussionUrl} />
     <div className="detail-grid">
       <div>
         <section className="theme-panel" aria-labelledby="theme-title"><p className="eyebrow">Тема конкурса</p><h2 id="theme-title">{contest.theme ?? "Пока между строк"}</h2>{!contest.theme && <p>Тема будет объявлена при старте конкурса. До этого момента она не публикуется.</p>}</section>
@@ -75,8 +78,8 @@ export default async function ContestPage({ params }: { params: Promise<{ slug: 
       {groups.length === 0 ? <p className="empty-stories">{contest.stage === "failed" ? "Публичные рассказы этого конкурса недоступны." : "Пока нет доступных для чтения рассказов. Здесь появятся опубликованные конкурсные работы."}</p> : <>
         <p className="muted">Чтение доступно без регистрации. Справочный объём, отмеченный знаком ≈, не является конкурсным подсчётом.</p>
         {groups.map((group) => <section className="story-group" id={`group-${group.key}`} key={group.key} aria-label={group.title}>
-          <h3>{group.title}</h3>{group.round === 2 && finalBallot && <p><Link href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>Мой финальный бюллетень →</Link></p>}{ballot?.groupId === group.key && <p><Link href={`/contests/${encodeURIComponent(slug)}/ballot`}>Мой бюллетень →</Link>{ballot.exempt && " · Вы освобождены от голосования"}</p>}{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
-            <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}{story.authorName && ` · ${story.authorName}`}</p></div>
+          <h3>{group.key === "ungrouped" ? group.title : <Link href={`/contests/${encodeURIComponent(slug)}/groups/${encodeURIComponent(group.key)}`}>{group.title}</Link>}</h3><CriticatLink url={group.criticatDiscussionUrl} group />{group.round === 2 && finalBallot && <p><Link href={`/contests/${encodeURIComponent(slug)}/final-ballot`}>Мой финальный бюллетень →</Link></p>}{ballot?.groupId === group.key && <p><Link href={`/contests/${encodeURIComponent(slug)}/ballot`}>Мой бюллетень →</Link>{ballot.exempt && " · Вы освобождены от голосования"}</p>}{group.stories.length > 0 && <p><a className="story-read" href={`${downloadHref}?group=${encodeURIComponent(group.key)}`}>Скачать группу в ZIP</a></p>}{!group.stories.length && <p className="muted">В этой группе сейчас нет доступных для чтения работ.</p>}<ul className="story-list">{group.stories.map((story) => <li key={story.id}>
+            <div><h4><Link href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>{story.title}</Link></h4><p className="muted">{story.volume}{story.authorName && ` · ${story.authorName}`}</p><AiGeneration value={story.aiGenerationBasisPoints} /></div>
             <Link className="story-read" aria-label={`Читать «${story.title}»`} href={`/contests/${encodeURIComponent(slug)}/stories/${encodeURIComponent(story.id)}`}>Читать <span aria-hidden="true">→</span></Link>
           </li>)}</ul>
         </section>)}

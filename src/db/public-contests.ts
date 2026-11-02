@@ -1,5 +1,6 @@
 import { currentTime } from "../server/clock";
 import "server-only";
+import { validatedCriticatUrl } from "../lib/story-annotations";
 import { and, asc, eq, lte, ne } from "drizzle-orm";
 import type { Contest } from "../lib/contests";
 import { getDatabase } from "./index";
@@ -12,7 +13,7 @@ export async function getPublicContests(slug?: string): Promise<Contest[]> {
   const { db } = await getDatabase();
   const now = currentTime();
   const rows = await db.select({
-    slug: contests.slug, title: contests.title, description: contests.description,
+    criticatDiscussionUrl: contests.criticatDiscussionUrl, slug: contests.slug, title: contests.title, description: contests.description,
     stage: contests.stage, minLength: contests.minLength, maxLength: contests.maxLength,
     preparationAt: contests.preparationAt, submissionsStartAt: contests.submissionsStartAt,
     submissionsEndAt: contests.submissionsEndAt, roundOneStartAt: contests.roundOneStartAt,
@@ -45,7 +46,7 @@ export async function getPublicContests(slug?: string): Promise<Contest[]> {
       : row.minLength ? `От ${number.format(row.minLength)} знаков с пробелами`
       : "Без конкурсных ограничений длины";
     return {
-      slug: row.slug, number: String(index + 1).padStart(2, "0"), title: row.title,
+      criticatDiscussionUrl: validatedCriticatUrl(row.criticatDiscussionUrl ?? ""), slug: row.slug, number: String(index + 1).padStart(2, "0"), title: row.title,
       description: row.description, stage: row.stage, theme: row.theme, isDemo: row.isDemo,
       conditions: row.conditions ?? ["Тема и дополнительные условия будут опубликованы при старте конкурса."],
       length, schedule,

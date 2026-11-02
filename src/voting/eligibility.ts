@@ -22,14 +22,14 @@ export async function eligibleStories(db: VotingDb, contest: VotingContest, grou
   const legacyPublic = ["round-one", "round-two", "completed"].includes(contest.stage) && +contest.roundOneStartAt <= +now && group.publishedAt !== null && +group.publishedAt <= +now;
   if (!formed && !legacyPublic) return [];
   const withdrawn = alias(storyRounds, "voting_withdrawn");
-  const rows = await db.select({ id: stories.id, title: stories.title, content: stories.content, publishedAt: stories.publishedAt }).from(storyRounds)
+  const rows = await db.select({ aiGenerationBasisPoints: stories.aiGenerationBasisPoints, id: stories.id, title: stories.title, content: stories.content, publishedAt: stories.publishedAt }).from(storyRounds)
     .innerJoin(stories, eq(storyRounds.storyId, stories.id)).innerJoin(participations, eq(stories.participationId, participations.id))
     .where(and(eq(storyRounds.contestId, contest.id), eq(storyRounds.groupId, groupId), eq(storyRounds.round, round), eq(storyRounds.status, "active"),
       eq(stories.status, "admitted"), isNull(stories.withdrawnAt), ne(participations.userId, userId),
       notExists(db.select({ one: sql`1` }).from(withdrawn).where(and(eq(withdrawn.storyId, stories.id), eq(withdrawn.status, "withdrawn")))),
     )).orderBy(asc(stories.createdAt), asc(stories.id));
   return rows.filter((row) => (round !== 2 || final!.snapshot.storyIds.includes(row.id)) && (formed || row.publishedAt && +row.publishedAt <= +now) && parseStoryContent(row.content))
-    .map(({ id, title }) => ({ id, title }));
+    .map(({ id, title, aiGenerationBasisPoints }) => ({ id, title, aiGenerationBasisPoints }));
 }
 
 // Called in the same write transaction as formation/withdrawal and before accepting votes.

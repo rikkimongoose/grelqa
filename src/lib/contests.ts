@@ -13,6 +13,7 @@ export const stageLabels: Record<Stage, string> = {
 
 type ScheduleItem = { stage: Stage; label: string; date: string };
 export type Contest = {
+  criticatDiscussionUrl?: string | null;
   slug: string;
   number: string;
   title: string;

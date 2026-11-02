@@ -51,12 +51,14 @@ export async function myBallot(token: string | undefined, slug: string, round: 1
     const frozen = state.closedSnapshot;
     const required = frozen ? Math.min(6, frozen.audit.stories.filter((story) => story.groupId === state.groupId && story.userId !== state.user.id && story.status === "admitted" && story.roundStatus === "active" && !story.globalWithdrawn).length) : Math.min(6, available.length);
     const ids = new Set(available.map((story) => story.id));
+    const aiValues = new Map(available.map((s) => [s.id, s.aiGenerationBasisPoints]));
     const visible = new Map(available.map((story) => [story.id, story.title]));
     // Only titles already present in this owner's selections; no authors or foreign votes.
     for (const id of new Set([...(draft?.selections ?? []), ...entries.map((entry) => entry.id)])) {
       if (!visible.has(id)) {
-        const [row] = await tx.select({ title: stories.title }).from(stories).where(eq(stories.id, id));
+        const [row] = await tx.select({ title: stories.title, aiGenerationBasisPoints: stories.aiGenerationBasisPoints }).from(stories).where(eq(stories.id, id));
         visible.set(id, row?.title ?? "Недоступная работа");
+        aiValues.set(id, row?.aiGenerationBasisPoints ?? null);
       }
     }
     const selected = draft?.selections ?? entries.map((entry) => entry.id);
@@ -64,9 +66,9 @@ export async function myBallot(token: string | undefined, slug: string, round: 1
       open: !state.closed && !state.blockedMessage && (round !== 2 || +currentTime() >= +new Date(state.preparedAt!)) && (round === 1 ? firstRoundOpen(contest, currentTime()) : finalRoundOpen(contest, currentTime())), blockedMessage: state.blockedMessage, rightsEnded: state.rightsEnded, exempt: (round === 1 ? member.roundOneExemptAt : member.roundTwoExemptAt) !== null,
       required, available, revision: draft?.revision ?? 0,
       hasDraft: draft?.selections !== null && draft?.selections !== undefined,
-      selected: selected.map((id, index) => ({ id, title: visible.get(id)!, position: index + 1, unavailable: !ids.has(id) })),
+      selected: selected.map((id, index) => ({ aiGenerationBasisPoints: aiValues.get(id) ?? null, id, title: visible.get(id)!, position: index + 1, unavailable: !ids.has(id) })),
       submittedAt: sent?.submittedAt?.toISOString() ?? null,
-      submitted: entries.map(({ id, position }) => ({ id, title: visible.get(id)!, position, unavailable: !ids.has(id) })),
+      submitted: entries.map(({ id, position }) => ({ aiGenerationBasisPoints: aiValues.get(id) ?? null, id, title: visible.get(id)!, position, unavailable: !ids.has(id) })),
     };
   });
 }

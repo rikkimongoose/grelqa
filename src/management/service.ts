@@ -52,14 +52,14 @@ export async function saveContest(token: string, input: unknown, slug?: string, 
     const day = value.submissionsStartAt.toISOString().slice(0, 10);
     const [busyDay] = await tx.select({ id: s.contests.id }).from(s.contests).where(eq(s.contests.startDayMoscow, day));
     if (busyDay && busyDay.id !== existing?.id) throw new ManagementError("В этот московский день уже начинается конкурс.", 409);
-    const fields = { title: value.title, description: value.description, discussionUrl: value.discussionUrl || null,
+    const fields = { title: value.title, description: value.description, discussionUrl: value.discussionUrl || null, criticatDiscussionUrl: value.criticatDiscussionUrl === undefined ? existing?.criticatDiscussionUrl ?? null : value.criticatDiscussionUrl,
       organizerId: owner.id, coordinatorId: coordinator?.id ?? null, submissionsStartAt: value.submissionsStartAt, startDayMoscow: day,
       submissionsEndAt: value.submissionsEndAt, roundOneStartAt: value.roundOneStartAt, roundTwoStartAt: value.roundTwoStartAt || null, endsAt: value.endsAt,
       groupCapacity: value.groupCapacity, finalCapacity: value.finalCapacity, minLength: value.minLength, maxLength: value.maxLength };
     const contestId = existing?.id ?? randomUUID(), contestSlug = existing?.slug ?? `contest-${randomUUID()}`;
     if (existing) await tx.update(s.contests).set({ ...fields, settingsRevision: existing.settingsRevision + 1 }).where(eq(s.contests.id, contestId));
     else await tx.insert(s.contests).values({ id: contestId, slug: contestSlug, ...fields, stage: "preparation", isDraft: true, createdAt: currentTime() });
-    const auditSettings = (row: typeof fields | typeof s.contests.$inferSelect) => ({ title: row.title, description: row.description, discussionUrl: row.discussionUrl, submissionsStartAt: row.submissionsStartAt.toISOString(), submissionsEndAt: row.submissionsEndAt.toISOString(), roundOneStartAt: row.roundOneStartAt.toISOString(), roundTwoStartAt: row.roundTwoStartAt?.toISOString() ?? null, endsAt: row.endsAt.toISOString(), groupCapacity: row.groupCapacity, finalCapacity: row.finalCapacity, minLength: row.minLength, maxLength: row.maxLength });
+    const auditSettings = (row: typeof fields | typeof s.contests.$inferSelect) => ({ title: row.title, description: row.description, discussionUrl: row.discussionUrl, criticatDiscussionUrl: row.criticatDiscussionUrl, submissionsStartAt: row.submissionsStartAt.toISOString(), submissionsEndAt: row.submissionsEndAt.toISOString(), roundOneStartAt: row.roundOneStartAt.toISOString(), roundTwoStartAt: row.roundTwoStartAt?.toISOString() ?? null, endsAt: row.endsAt.toISOString(), groupCapacity: row.groupCapacity, finalCapacity: row.finalCapacity, minLength: row.minLength, maxLength: row.maxLength });
     await adminEvent(tx, contestId, user.id, existing ? "settings" : "create", { before: existing ? auditSettings(existing) : null, after: auditSettings(fields), roles: { before: existing ? { ownerId: existing.organizerId, coordinatorId: existing.coordinatorId } : null, after: { ownerId: owner.id, coordinatorId: coordinator?.id ?? null } }, rolesChanged: existing ? existing.organizerId !== owner.id || existing.coordinatorId !== (coordinator?.id ?? null) : true, fields: Object.keys(fields), previousRevision: existing?.settingsRevision ?? null, nextRevision: (existing?.settingsRevision ?? 0) + 1 });
     return { slug: contestSlug };
   });
@@ -176,15 +176,16 @@ export async function managementView(token: string, slug: string) {
     const own = user.id === contest.organizerId;
     const [owner] = own ? await tx.select({ email: s.users.email }).from(s.users).where(eq(s.users.id, contest.organizerId)) : [];
     const [coord] = own && contest.coordinatorId ? await tx.select({ email: s.users.email }).from(s.users).where(eq(s.users.id, contest.coordinatorId)) : [];
-    const works = await tx.select({ id: s.stories.id, title: s.stories.title, content: s.stories.content, status: s.stories.status, length: s.stories.length }).from(s.stories).where(and(eq(s.stories.contestId, contest.id), ne(s.stories.status, "draft"))).orderBy(asc(s.stories.createdAt));
+    const works = await tx.select({ id: s.stories.id, title: s.stories.title, content: s.stories.content, status: s.stories.status, aiGenerationBasisPoints: s.stories.aiGenerationBasisPoints, length: s.stories.length }).from(s.stories).where(and(eq(s.stories.contestId, contest.id), ne(s.stories.status, "draft"))).orderBy(asc(s.stories.createdAt));
     const [theme] = await tx.select({ enteredAt: s.contestThemes.enteredAt }).from(s.contestThemes).where(eq(s.contestThemes.contestId, contest.id));
     const [formation] = await tx.select({ at: s.firstRoundFormations.formedAt }).from(s.firstRoundFormations).where(eq(s.firstRoundFormations.contestId, contest.id));
     const members = await tx.select({ id: s.participations.id, mustOne: s.participations.mustVoteRoundOne, mustTwo: s.participations.mustVoteRoundTwo, exemptOne: s.participations.roundOneExemptAt, exemptTwo: s.participations.roundTwoExemptAt }).from(s.participations).where(eq(s.participations.contestId, contest.id));
     const events = await tx.select({ action: s.contestAdminEvents.action, details: s.contestAdminEvents.details, at: s.contestAdminEvents.createdAt, actorName: s.users.publicName }).from(s.contestAdminEvents).leftJoin(s.users, eq(s.contestAdminEvents.actorId, s.users.id)).where(eq(s.contestAdminEvents.contestId, contest.id)).orderBy(desc(s.contestAdminEvents.createdAt)).limit(100);
+    const groups = await tx.select({ id: s.contestGroups.id, round: s.contestGroups.round, number: s.contestGroups.number, criticatDiscussionUrl: s.contestGroups.criticatDiscussionUrl }).from(s.contestGroups).where(eq(s.contestGroups.contestId, contest.id));
     const schedule = await scheduleStatus(tx, contest);
     const { organizerId: _owner, coordinatorId: _coord, ...safe } = contest;
     void _owner; void _coord;
-    return { schedule, contest: safe, owner: own, ownerEmail: owner?.email ?? "", coordinatorEmail: coord?.email ?? "", works, themeEntered: Boolean(theme), formedAt: formation?.at?.toISOString() ?? null, participantCount: members.length,
+    return { groups, schedule, contest: safe, owner: own, ownerEmail: owner?.email ?? "", coordinatorEmail: coord?.email ?? "", works, themeEntered: Boolean(theme), formedAt: formation?.at?.toISOString() ?? null, participantCount: members.length,
       events: events.map((e) => ({ action: e.action, at: e.at.toISOString(), actor: e.action === "theme-entered-by-link" ? "Получатель ссылки" : e.details.actor === "scheduler" ? "Автоматический обработчик" : e.actorName || "Уполномоченный пользователь", ...eventView(e.action, e.details, works) })) };
   });
   const rounds = [];

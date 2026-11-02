@@ -1,4 +1,5 @@
 "use client";
+import { AiGeneration } from "./ai-generation";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { formatDate } from "@/lib/contests";
@@ -55,7 +56,7 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
     {initial.exempt && <p className="empty-stories">Вы освобождены от голосования: в вашем туре нет доступных чужих работ. Отправлять пустой бюллетень не нужно.</p>}
     <section aria-labelledby="submitted-title"><h2 id="submitted-title">Отправленная версия</h2>
       {submittedAt ? <p>Последняя успешная отправка: <time dateTime={submittedAt}>{formatDate(submittedAt)}</time> (МСК).</p> : submitted.length ? <p>Отправка принята. Обновляем время подтверждения…</p> : <p>Бюллетень ещё не отправлен. Черновик не выполняет обязанность голосования.</p>}
-      {submitted.length > 0 && <><p>{initial.rightsEnded ? "Сохранена ранее отправленная версия; новые изменения недоступны." : "Бюллетень засчитан. Снятие выбранной работы не отменяет отправку и не сдвигает остальные места."}</p><ol>{submitted.map((item) => <li key={item.id} value={item.position}>{item.title}{item.unavailable && " — снята или недоступна, баллы не учитываются"}</li>)}</ol></>}
+      {submitted.length > 0 && <><p>{initial.rightsEnded ? "Сохранена ранее отправленная версия; новые изменения недоступны." : "Бюллетень засчитан. Снятие выбранной работы не отменяет отправку и не сдвигает остальные места."}</p><ol>{submitted.map((item) => <li key={item.id} value={item.position}>{item.title}<AiGeneration value={item.aiGenerationBasisPoints} />{item.unavailable && " — снята или недоступна, баллы не учитываются"}</li>)}</ol></>}
     </section>
     <section aria-labelledby="draft-title"><h2 id="draft-title">{hasDraft ? "Сохранённый черновик" : "Ваш выбор"}{dirty ? " · есть несохранённые изменения" : ""}</h2>
       <p aria-live="polite">Выбрано {selected.length} из {initial.required} необходимых работ.</p>
@@ -64,7 +65,7 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
       <ol className="ballot-choices">{selected.map((item, index) => <li key={item.id} data-story-id={item.id} draggable={writable && !busy}
         onDragStart={(event) => { dragged.current = index; event.dataTransfer.setData("text/plain", item.id); event.dataTransfer.effectAllowed = "move"; }}
         onDragOver={(event) => { if (writable) event.preventDefault(); }} onDrop={(event) => { event.preventDefault(); if (dragged.current !== null) move(dragged.current, index); dragged.current = null; }} onDragEnd={() => { dragged.current = null; }}>
-        <div>{index + 1}. {item.unavailable ? <span>{item.title} — снята или недоступна</span> : <Link href={reading(item)}>{item.title}</Link>}</div>
+        <div>{index + 1}. {item.unavailable ? <span>{item.title} — снята или недоступна</span> : <Link href={reading(item)}>{item.title}</Link>}<AiGeneration value={item.aiGenerationBasisPoints} /></div>
         <div className="ballot-controls"><button type="button" aria-label={`Выше: ${item.title}`} disabled={!writable || busy || index === 0} onClick={() => move(index, index - 1)}>Выше</button><button type="button" aria-label={`Ниже: ${item.title}`} disabled={!writable || busy || index === selected.length - 1} onClick={() => move(index, index + 1)}>Ниже</button><button type="button" aria-label={`Убрать: ${item.title}`} disabled={!writable || busy} onClick={() => setSelected((rows) => rows.filter((row) => row.id !== item.id))}>Убрать</button></div>
       </li>)}</ol>
       {!selected.length && <p className="muted">Пока ничего не выбрано.</p>}
@@ -72,7 +73,7 @@ export function BallotEditor({ initial }: { initial: BallotView }) {
       <p role="status" aria-live="polite">{message}</p>
     </section>
     <section><h2>{initial.round === 2 ? "Доступные финальные рассказы" : "Доступные рассказы назначенной группы"}</h2><p className="muted">Свои работы выбирать нельзя. Порядок можно менять кнопками с клавиатуры или перетаскиванием.</p>
-      <ul className="story-list">{initial.available.map((item) => <li key={item.id}><Link href={reading({ ...item, position: 0, unavailable: false })}>{item.title}</Link><button type="button" disabled={!writable || busy || selected.length >= 6 || selected.some((entry) => entry.id === item.id)} onClick={() => setSelected((rows) => [...rows, { ...item, position: rows.length + 1, unavailable: false }])}>Добавить<span className="sr-only">: {item.title}</span></button></li>)}</ul>
+      <ul className="story-list">{initial.available.map((item) => <li key={item.id}><div><Link href={reading({ ...item, position: 0, unavailable: false })}>{item.title}</Link><AiGeneration value={item.aiGenerationBasisPoints} /></div><button type="button" disabled={!writable || busy || selected.length >= 6 || selected.some((entry) => entry.id === item.id)} onClick={() => setSelected((rows) => [...rows, { ...item, position: rows.length + 1, unavailable: false }])}>Добавить<span className="sr-only">: {item.title}</span></button></li>)}</ul>
     </section>
   </>;
 }

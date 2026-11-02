@@ -1,3 +1,4 @@
+import { AiGeneration } from "@/components/ai-generation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -28,7 +29,7 @@ export default async function StoryPage({ params }: Props) {
   return <div className="reading-page">
     <Link className="back-link" href={back}>← К рассказам конкурса</Link>
     <article className="reading-article">
-      <header className="reading-header"><p className="eyebrow">{story.contestTitle}</p><h1>{story.title}</h1><p className="muted">{story.volume}</p><p className="muted">{story.authorName ? `Автор: ${story.authorName}` : "Анонимный конкурсный рассказ"}</p></header>
+      <header className="reading-header"><p className="eyebrow">{story.contestTitle}</p><h1>{story.title}</h1><p className="muted">{story.volume}</p><p className="muted">{story.authorName ? `Автор: ${story.authorName}` : "Анонимный конкурсный рассказ"}</p><AiGeneration value={story.aiGenerationBasisPoints} /></header>
       <StoryText content={story.content} />
     </article>
     {canAdd && <BallotAdd slug={slug} storyId={storyId} initialRevision={ballot!.revision} round={ballot!.round} />}

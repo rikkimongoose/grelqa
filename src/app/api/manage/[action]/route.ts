@@ -1,3 +1,5 @@
+import { revalidatePath } from "next/cache";
+import { saveAnnotation } from "@/management/annotations";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authConfig } from "@/auth/config";
@@ -34,6 +36,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     const { db } = await getDatabase(); const user = await verifiedManager(db, token);
     await limit(`management:${user.id}`, 120, 60);
     const data = await json(request);
+    if (action === "annotation") {
+      const v = z.object({ slug, annotation: z.unknown() }).strict().parse(data);
+      const saved = await saveAnnotation(token, v.slug, v.annotation);
+      const base = `/contests/${encodeURIComponent(v.slug)}`;
+      revalidatePath(base); revalidatePath(`/manage/${encodeURIComponent(v.slug)}`);
+      for (const id of saved.groupIds) revalidatePath(`${base}/groups/${encodeURIComponent(id)}`);
+      if (saved.storyId) { revalidatePath(`${base}/stories/${encodeURIComponent(saved.storyId)}`); revalidatePath(`${base}/ballot`); revalidatePath(`${base}/final-ballot`); }
+      return reply({ message: saved.message });
+    }
     if (action === "save") {
       const v = z.object({ settings: z.unknown(), slug: slug.optional(), revision: z.number().int().positive().optional() }).strict().parse(data);
       return reply({ ...await saveContest(token, v.settings, v.slug, v.revision), message: "Настройки сохранены." });

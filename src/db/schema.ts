@@ -52,6 +52,7 @@ export const contests = sqliteTable("contests", {
   title: text("title").notNull(),
   description: text("description").notNull(),
   discussionUrl: text("discussion_url"),
+  criticatDiscussionUrl: text("criticat_discussion_url"),
   stage: text("stage", { enum: stages }).notNull().default("preparation"),
   failureReason: text("failure_reason"),
   preparationAt: instant("preparation_at"),
@@ -96,6 +97,7 @@ export const firstRoundFormations = sqliteTable("first_round_formations", {
 });
 
 export const contestGroups = sqliteTable("contest_groups", {
+  criticatDiscussionUrl: text("criticat_discussion_url"),
   id: id(),
   contestId: text("contest_id").notNull().references(() => contests.id, { onDelete: "restrict" }),
   round: integer("round").notNull(),
@@ -135,6 +137,7 @@ export const participations = sqliteTable("participations", {
 export type StoryContent = { type: "paragraph"; children: { text: string; bold?: boolean; italic?: boolean }[] }[];
 
 export const stories = sqliteTable("stories", {
+  aiGenerationBasisPoints: integer("ai_generation_basis_points"),
   id: id(),
   contestId: text("contest_id").notNull().references(() => contests.id, { onDelete: "restrict" }),
   participationId: text("participation_id").notNull(),
@@ -154,6 +157,7 @@ export const stories = sqliteTable("stories", {
   unique("story_scope").on(t.id, t.contestId),
   index("story_author").on(t.participationId, t.contestId),
   foreignKey({ columns: [t.participationId, t.contestId], foreignColumns: [participations.id, participations.contestId] }).onDelete("restrict"),
+  check("story_ai_percentage", sql`${t.aiGenerationBasisPoints} is null or (typeof(${t.aiGenerationBasisPoints}) = 'integer' and ${t.aiGenerationBasisPoints} between 0 and 10000)`),
   check("story_status", sql`${t.status} in ('draft','submitted','admitted','rejected','withdrawn')`),
   check("story_length", sql`(${t.length} is null and ${t.lengthAlgorithm} is null) or (${t.length} is not null and ${t.length} >= 0 and ${t.lengthAlgorithm} is not null)`),
   check("story_withdrawal", sql`${t.status} != 'withdrawn' or (${t.withdrawnAt} is not null and ${t.withdrawalReason} is not null)`),

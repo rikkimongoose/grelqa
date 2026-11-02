@@ -1,5 +1,6 @@
 import { currentTime } from "../server/clock";
 import "server-only";
+import { validatedCriticatUrl } from "../lib/story-annotations";
 import { publicAuthorName } from "./author-publication";
 import { and, asc, eq, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { formedPublication, groupedStory, groupPublication } from "./story-publication";
@@ -12,7 +13,7 @@ import { parseStoryContent, storyVolume } from "../lib/story-content";
 async function readableStories(contestSlug: string, storyId?: string, connection?: Pick<Database, "select">, now = currentTime()) {
   const db = connection ?? (await getDatabase()).db;
   return db.select({
-    authorName: publicAuthorName(), id: stories.id, title: stories.title, content: stories.content, length: stories.length,
+    aiGenerationBasisPoints: stories.aiGenerationBasisPoints, authorName: publicAuthorName(), id: stories.id, title: stories.title, content: stories.content, length: stories.length,
     contestTitle: contests.title, contestSlug: contests.slug,
   }).from(stories).innerJoin(contests, eq(stories.contestId, contests.id)).where(and(
     eq(contests.slug, contestSlug), eq(contests.isDraft, false),
@@ -34,7 +35,7 @@ export async function getPublicStory(contestSlug: string, storyId: string) {
   const content = parseStoryContent(row.content);
   if (!content) return undefined;
   return { id: row.id, title: row.title, contestTitle: row.contestTitle, contestSlug: row.contestSlug,
-    authorName: row.authorName, content, volume: storyVolume(content, row.length) };
+    aiGenerationBasisPoints: row.aiGenerationBasisPoints, authorName: row.authorName, content, volume: storyVolume(content, row.length) };
 }
 
 export async function getPublicStoryGroupContents(contestSlug: string) {
@@ -57,25 +58,26 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
       groupPublication(db, now),
     )).orderBy(asc(contestGroups.round), asc(contestGroups.number)) : [];
   const byStory = new Map(assignments.map((item) => [item.storyId, item]));
-  type Summary = { authorName: string | null; id: string; title: string; volume: string; content: NonNullable<ReturnType<typeof parseStoryContent>> };
-  const groups = new Map<string, { key: string; title: string; round: number; number: number; stories: Summary[] }>();
+  type Summary = { aiGenerationBasisPoints: number | null; authorName: string | null; id: string; title: string; volume: string; content: NonNullable<ReturnType<typeof parseStoryContent>> };
+  const groups = new Map<string, { criticatDiscussionUrl: string | null; key: string; title: string; round: number; number: number; stories: Summary[] }>();
   // Опубликованный якорь группы сохраняется, даже если все её работы сняты.
-  const publishedGroups = await db.select({ id: contestGroups.id, round: contestGroups.round, number: contestGroups.number }).from(contestGroups)
+  const publishedGroups = await db.select({ id: contestGroups.id, round: contestGroups.round, number: contestGroups.number, url: contestGroups.criticatDiscussionUrl }).from(contestGroups)
     .innerJoin(contests, eq(contestGroups.contestId, contests.id)).where(and(
       eq(contests.slug, contestSlug), groupPublication(db, now),
     ));
-  for (const group of publishedGroups) groups.set(group.id, { key: group.id, title: `${group.round === 1 ? "Первый тур" : "Финал"} · Группа ${group.number}`, round: group.round, number: group.number, stories: [] });
+  for (const group of publishedGroups) groups.set(group.id, { criticatDiscussionUrl: validatedCriticatUrl(group.url ?? ""), key: group.id, title: `${group.round === 1 ? "Первый тур" : "Финал"} · Группа ${group.number}`, round: group.round, number: group.number, stories: [] });
   for (const row of rows) {
     const content = parseStoryContent(row.content);
     if (!content) continue;
     const assignment = byStory.get(row.id);
     const key = assignment?.groupId ?? "ungrouped";
     const group = groups.get(key) ?? {
+      criticatDiscussionUrl: null,
       key,
       title: assignment ? `${assignment.round === 1 ? "Первый тур" : "Финал"} · Группа ${assignment.number}` : "Рассказы без опубликованной группы",
       round: assignment?.round ?? 3, number: assignment?.number ?? 0, stories: [],
     };
-    group.stories.push({ authorName: row.authorName, id: row.id, title: row.title, volume: storyVolume(content, row.length), content });
+    group.stories.push({ aiGenerationBasisPoints: row.aiGenerationBasisPoints, authorName: row.authorName, id: row.id, title: row.title, volume: storyVolume(content, row.length), content });
     groups.set(key, group);
   }
   return { title: contest.title, groups: [...groups.values()].sort((a, b) => a.round - b.round || a.number - b.number) };
@@ -83,5 +85,19 @@ async function readGroups(db: Pick<Database, "select">, contestSlug: string, now
 
 export async function getPublicStoryGroups(contestSlug: string) {
   const snapshot = await getPublicStoryGroupContents(contestSlug);
-  return snapshot?.groups.map((group) => ({ ...group, stories: group.stories.map(({ id, title, volume, authorName }) => ({ id, title, volume, authorName })) })) ?? [];
+  return snapshot?.groups.map((group) => ({ ...group, stories: group.stories.map(({ id, title, volume, authorName, aiGenerationBasisPoints }) => ({ id, title, volume, authorName, aiGenerationBasisPoints })) })) ?? [];
+}
+
+export async function getPublicGroup(contestSlug: string, groupId: string) {
+  const { db } = await getDatabase();
+  return db.transaction(async (tx) => {
+    const now = currentTime();
+    const [group] = await tx.select({ id: contestGroups.id, number: contestGroups.number, round: contestGroups.round, url: contestGroups.criticatDiscussionUrl, contestTitle: contests.title }).from(contestGroups)
+      .innerJoin(contests, eq(contestGroups.contestId, contests.id)).where(and(eq(contests.slug, contestSlug), eq(contests.isDraft, false), eq(contestGroups.id, groupId), groupPublication(tx, now)));
+    if (!group) return undefined;
+    const members = new Set((await tx.select({ id: storyRounds.storyId }).from(storyRounds).where(and(eq(storyRounds.groupId, group.id), eq(storyRounds.round, group.round)))).map((r) => r.id));
+    const rows = await readableStories(contestSlug, undefined, tx, now);
+    return { title: `${group.round === 1 ? "Первый тур" : "Финал"} · Группа ${group.number}`, contestTitle: group.contestTitle, criticatDiscussionUrl: validatedCriticatUrl(group.url ?? ""),
+      stories: rows.filter((r) => members.has(r.id)).flatMap((r) => { const content = parseStoryContent(r.content); return content ? [{ id: r.id, title: r.title, volume: storyVolume(content, r.length), authorName: r.authorName, aiGenerationBasisPoints: r.aiGenerationBasisPoints }] : []; }) };
+  });
 }

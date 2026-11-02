@@ -10,7 +10,7 @@ import { hash } from "@node-rs/argon2";
 import { eq } from "drizzle-orm";
 import { chromium } from "playwright-core";
 import { openDatabase } from "../src/db/connection";
-import { users } from "../src/db/schema";
+import { users, stories } from "../src/db/schema";
 test("управление в браузере: ссылка, анонимный ввод темы, публикация, модерация и телефон", { timeout: 180000 }, async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), "grelqa-management-browser-"));
   const listener = createServer(); listener.listen(0, "127.0.0.1"); await once(listener, "listening"); const port = (listener.address() as { port: number }).port; await new Promise<void>((resolve) => listener.close(() => resolve()));
@@ -20,6 +20,7 @@ test("управление в браузере: ссылка, анонимный
   try {
     for (const script of ["scripts/migrate.ts", "scripts/demo-management.ts"]) execFileSync(process.execPath, ["--import", "tsx", script], { env, stdio: "pipe" });
     const password = "management-browser-only password 123"; await connection.db.update(users).set({ passwordHash: await hash(password) }).where(eq(users.id, "demo-management-owner"));
+    await connection.db.update(stories).set({ title: "Репортаж 1 " + "Оченьдлинноеназвание".repeat(18) }).where(eq(stories.id, "demo-management-story-1"));
     server = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], { env, stdio: ["ignore", "pipe", "pipe"] });
     await new Promise<void>((resolve, reject) => { let output = ""; const timer = setTimeout(() => reject(new Error(output)), 45000); const collect = (b: Buffer) => { output += b; if (output.includes("Ready")) { clearTimeout(timer); resolve(); } }; server!.stdout!.on("data", collect); server!.stderr!.on("data", collect); server!.once("error", reject); server!.once("exit", () => { clearTimeout(timer); reject(new Error(output)); }); });
     browser = await chromium.launch({ executablePath: process.env.CHROMIUM_PATH || "/snap/bin/chromium", headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
@@ -36,11 +37,20 @@ test("управление в браузере: ссылка, анонимный
     await page.goto(base + "/manage/demo-management-moderation");
     for (let n = 1; n <= 3; n++) {
       const story = page.locator("details").filter({ has: page.locator("summary").filter({ hasText: `Репортаж ${n}` }) }); await story.locator("summary").click();
+      if (n === 1) {
+        await story.getByLabel("AI-генерация, %", { exact: true }).fill("35,25");
+        await story.getByRole("button", { name: "Сохранить показатель", exact: true }).click();
+        await story.getByText(/Информация сохранена/).waitFor();
+      }
       await story.getByLabel("Решение", { exact: true }).selectOption(n === 3 ? "reject" : "admit"); await story.getByLabel("Причина", { exact: true }).fill("Проверено в браузере"); await story.getByRole("checkbox").check(); await story.getByRole("button", { name: "Сохранить решение", exact: true }).click(); await story.getByText(/Решение сохранено/).waitFor();
     }
     await page.reload(); const formation = page.locator("form").filter({ has: page.getByRole("button", { name: "Сформировать группы", exact: true }) }); await formation.getByRole("checkbox").check(); await formation.getByRole("button", { name: "Сформировать группы", exact: true }).click(); await formation.getByText(/Группы сформированы и опубликованы/).waitFor(); await page.reload();
-    await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-    await page.goto(base + "/contests/demo-management-moderation"); await page.getByRole("link", { name: "Читать «Репортаж 1»" }).waitFor(); assert.doesNotMatch(await page.locator("main").innerText(), /Демонстрационный author|management-author/);
+    const groupLink = page.getByLabel("Ссылка на обсуждение группы на Criticat", { exact: true });
+    await groupLink.fill("https://criticat.org/topic/group-test");
+    const linkForm = page.locator("form").filter({ has: groupLink }); await linkForm.getByRole("button", { name: "Сохранить ссылку", exact: true }).click(); await linkForm.getByText(/Информация сохранена/).waitFor();
+    await page.setViewportSize({ width: 390, height: 844 }); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), JSON.stringify(await page.evaluate(() => [...document.querySelectorAll("main *")].filter((e) => e.getBoundingClientRect().right > innerWidth).slice(0, 6).map((e) => ({ tag: e.tagName, className: e.className, text: e.textContent?.slice(0, 60) })))));
+    await page.goto(base + "/contests/demo-management-moderation"); await page.getByRole("link", { name: /^Читать «Репортаж 1/ }).waitFor(); await page.getByText("AI-генерация: 35.25%", { exact: true }).waitFor(); await page.getByRole("link", { name: /Обсудить группу на Criticat/ }).waitFor(); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await page.getByRole("link", { name: /^Читать «Репортаж 1/ }).click(); await page.getByText("AI-генерация: 35.25%", { exact: true }).waitFor(); assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); assert.doesNotMatch(await page.locator("main").innerText(), /Демонстрационный author|management-author/);
     await anon.close();
   } finally {
     await browser?.close(); if (server && server.exitCode === null && server.signalCode === null) { const exit = once(server, "exit"); server.kill("SIGTERM"); await exit; } connection.client.close(); await rm(directory, { recursive: true, force: true });
