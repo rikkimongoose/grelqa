@@ -9,6 +9,7 @@
 ## Устройство
 
 - `src/app/layout.tsx`, `globals.css`, `not-found.tsx` — общий каркас и оформление.
+- `src/app/rules/page.tsx` — публичный пользовательский регламент `/rules`; при изменении согласованных правил сверяйте его с документом требований и дополнениями в `docs/`. Не переносите предложения в действующие правила.
 - `src/app/page.tsx`, `src/app/contests/[slug]/page.tsx` — серверные динамические страницы; читают SQLite на запросе, не фиксируют данные в сборке.
 - `src/components/stage-badge.tsx`, `src/lib/contests.ts` — подписи/типы этапов и форматирование МСК. Не размещайте здесь секретные данные и seed.
 - `src/db/schema.ts` — Drizzle-схема и выводимые из неё типы. Конкурсные таблицы: users, contests, contest_themes, participations, contest_groups, stories, story_rounds, ballots, ballot_entries.

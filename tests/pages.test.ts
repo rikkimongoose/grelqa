@@ -57,7 +57,7 @@ test("собранные страницы читают SQLite и не раскр
       server!.stdout!.on("data", collect);
       server!.stderr!.on("data", collect);
     });
-    for (const route of ["/", "/contests/letters-to-november", "/contests/city-between-lines", "/contests/winter-notebook", "/contests/city-between-lines/stories/demo-city-story-1"]) {
+    for (const route of ["/", "/rules", "/contests/letters-to-november", "/contests/city-between-lines", "/contests/winter-notebook", "/contests/city-between-lines/stories/demo-city-story-1"]) {
       for (const rsc of [false, true]) {
         const response = await fetch(baseUrl + route, { headers: rsc ? { RSC: "1" } : {} });
         assert.equal(response.status, 200, route);
