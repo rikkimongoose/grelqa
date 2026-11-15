@@ -11,7 +11,7 @@ export default async function Home() {
     <section className="hero">
       <p className="eyebrow">Анонимные литературные конкурсы</p>
       <h1>Сначала — история.<br /><em>Анонимность гарантирована. Позор — как повезёт...</em></h1>
-      <p className="hero-copy">В каждой избушке свои погремушки.</p>
+      <p className="hero-copy">В каждой избушке свои <Link href={`/wisdom`}>погремушки</Link>.</p>
       <a className="button" href="#contests">Найти свой конкурс <span aria-hidden="true">↓</span></a>
       <span className="hero-mark" aria-hidden="true">Аа</span>
     </section>
