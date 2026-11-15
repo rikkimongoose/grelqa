@@ -8,8 +8,9 @@ User=grelqa
 Group=grelqa
 WorkingDirectory=/srv/grelqa
 Environment=NODE_ENV=production
+Environment=PATH=/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
 EnvironmentFile=/etc/grelqa/scheduler.env
-ExecStart=/opt/node/bin/node --import tsx scripts/process-schedule.ts
+ExecStart=/srv/grelqa/bin/grelqa schedule
 TimeoutStartSec=5min
 UMask=0077
 NoNewPrivileges=true

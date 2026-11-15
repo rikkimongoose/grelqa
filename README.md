@@ -22,6 +22,8 @@ npm run dev
 
 Откройте http://localhost:3000. Если nvm отсутствует, установите указанную версию Node другим способом. Существующий `.env` не перезаписывайте: добавьте в него `DATABASE_URL=file:./data/grelqa.db`. Путь относительно корня проекта; разрешены только локальные `file:` URL.
 
+Готовый standalone-архив для Ubuntu 24.04 x86-64, ручной запуск GitHub Actions и установка без `npm install` описаны в [docs/deployment.md](docs/deployment.md).
+
 `db:migrate` создаёт каталог и файл базы, применяет только ещё не выполненные миграции. `db:seed` необязателен: без него список конкурсов пуст. Приложение не применяет миграции и не запускает seed автоматически. Сборка не требует существующей базы; для запуска страниц нужна мигрированная база.
 
 ## Единая начальная миграция и перенос существующей базы
@@ -578,7 +580,7 @@ npm run schedule:run -- --contest demo-schedule-live
 
 ### Ubuntu: шаблоны systemd
 
-В `deploy/systemd/` находятся `grelqa-scheduler.service`, `grelqa-scheduler.timer` и `scheduler.env.example`. Шаблоны ничего не устанавливают. Они предполагают `/srv/grelqa`, пользователя/группу `grelqa`, стабильный бинарник `/opt/node/bin/node` и файл окружения `/etc/grelqa/scheduler.env`. Оператор должен подставить реальные пути и ту же SQLite, что использует сайт. Node должен соответствовать `.nvmrc`; worker запускает TS через tsx, поэтому на его машине нужен `npm ci` с dev-зависимостями, а не `--omit=dev`. Никакой интерактивной nvm в unit нет.
+В `deploy/systemd/` находятся `grelqa-scheduler.service`, `grelqa-scheduler.timer` и `scheduler.env.example`. Шаблоны ничего не устанавливают. Они предполагают `/srv/grelqa`, пользователя/группу `grelqa`, стабильный Node в `/opt/node/bin`, release-команду `/srv/grelqa/bin/grelqa` и файл окружения `/etc/grelqa/scheduler.env`. Оператор должен подставить реальные пути и ту же SQLite, что использует сайт. Node должен соответствовать `.nvmrc`; `tsx` входит в production-зависимости и готовый релизный архив, поэтому worker не требует devDependencies или `npm install` на VPS. Никакой интерактивной nvm в unit нет.
 
 Убедитесь, что пользователь службы может читать проект и писать в каталог базы (включая вспомогательные файлы SQLite). `ReadWritePaths` должен соответствовать каталогу DATABASE_URL. Пример окружения содержит только абсолютный путь базы, без секретов; реальный файл окружения не сохраняйте в репозитории. Шаблоны используют отдельный oneshot-процесс, `OnCalendar` каждую минуту и Persistent для восстановления после выключения машины. Уже активный oneshot не запускается таймером повторно. Настройки описаны в первичных документах [systemd.timer](https://www.freedesktop.org/software/systemd/man/latest/systemd.timer.html) и [systemd.exec](https://www.freedesktop.org/software/systemd/man/latest/systemd.exec.html).
 

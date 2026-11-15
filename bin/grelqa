@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+release_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$release_root"
+
+usage() {
+  cat <<'EOF'
+Использование: bin/grelqa <команда> [аргументы]
+
+  server         запустить standalone-сервер
+  migrate        применить миграции к DATABASE_URL
+  rebuild        перенести актуальную старую базу в новый файл
+  schedule       выполнить один проход обработчика расписания
+  exports-clean  очистить устаревший кеш публичных ZIP
+  help           показать эту справку
+EOF
+}
+
+command_name="${1:-help}"
+if [[ $# -gt 0 ]]; then shift; fi
+
+case "$command_name" in
+  server)
+    exec node server.js "$@"
+    ;;
+  migrate)
+    exec node --import tsx scripts/migrate.ts "$@"
+    ;;
+  rebuild)
+    exec node --import tsx scripts/rebuild-database.ts "$@"
+    ;;
+  schedule)
+    exec node --import tsx scripts/process-schedule.ts "$@"
+    ;;
+  exports-clean)
+    exec node --import tsx scripts/clean-exports.ts "$@"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    printf 'Неизвестная команда: %s\n\n' "$command_name" >&2
+    usage >&2
+    exit 2
+    ;;
+esac

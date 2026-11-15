@@ -13,6 +13,7 @@ export default function nextConfig(phase: string): NextConfig {
       ] }));
     },
     serverExternalPackages: ["@node-rs/argon2"],
+    output: "standalone",
     turbopack: { root: process.cwd() },
     outputFileTracingRoot: process.cwd(),
   };

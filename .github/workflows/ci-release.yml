@@ -1,0 +1,82 @@
+name: Checks and release archive
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CHROMIUM_PATH: /usr/bin/google-chrome
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up project Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint and type-check
+        run: npm run check
+
+      - name: Build production standalone server
+        run: npm run build
+
+      - name: Run integration tests
+        run: |
+          npm run test:db
+          npm run test:rebuild
+          npm run test:pages
+          npm run test:auth
+          npm run test:submissions
+          npm run test:grouping
+          npm run test:exports
+          npm run test:feeds
+          npm run test:voting
+          npm run test:closure
+          npm run test:final-voting
+          npm run test:finalization
+          npm run test:management
+          npm run test:schedule
+          npm run test:annotations
+          npm run test:voting:browser
+          npm run test:final-voting:browser
+          npm run test:management:browser
+
+      - name: Build release archive
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        env:
+          GRELQA_RELEASE_COMMIT: ${{ github.sha }}
+        run: scripts/release/build-release.sh dist
+
+      - name: Verify archive outside the repository
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        run: scripts/release/smoke-release.sh dist/grelqa-${GITHUB_SHA::12}-linux-x64.tar.gz
+
+      - name: Upload release archive and checksums
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push'
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
+        with:
+          name: grelqa-${{ github.sha }}-linux-x64
+          path: |
+            dist/*.tar.gz
+            dist/*.sha256
+            dist/*.metadata.txt
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
